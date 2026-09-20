@@ -494,9 +494,9 @@ public class ConfigManager implements NeyShulkerConfig {
             return null;
         }
 
-        Material material = Material.matchMaterial(name.trim());
-
-        return material == null || !material.isItem() ? null : material;
+        // isItem() не проверяем: реестр материалов поднимается только на сервере,
+        // а "лишний" блок-материал в списке безвреден - предметы им не совпадут
+        return Material.matchMaterial(name.trim());
 
     }
 

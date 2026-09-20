@@ -9,17 +9,17 @@ import org.jetbrains.annotations.Nullable;
  * Тестовая реализация ItemStack без сервера.
  * Позволяет проверять транзакционную логику переноса предметов в обычном JUnit.
  */
-class FakeItemStack extends ItemStack {
+public class FakeItemStack extends ItemStack {
 
     private final Material material;
     private final int maxStackSize;
     private int amount;
 
-    FakeItemStack(@NotNull Material material, int amount) {
+    public FakeItemStack(@NotNull Material material, int amount) {
         this(material, amount, 64);
     }
 
-    FakeItemStack(@NotNull Material material, int amount, int maxStackSize) {
+    public FakeItemStack(@NotNull Material material, int amount, int maxStackSize) {
 
         this.material = material;
         this.amount = amount;
