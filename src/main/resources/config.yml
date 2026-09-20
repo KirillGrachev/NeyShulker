@@ -1,0 +1,158 @@
+settings:
+  enabled: true # Master switch. If false - the plugin does nothing at all
+
+  shulker:
+    # How the shulker box GUI is opened with a right click:
+    # SHIFT      - only while sneaking (Shift + RMB). Recommended: sneaking never places
+    #              the box, so you can still place it normally without Shift.
+    # NO_SHIFT   - only while NOT sneaking (plain RMB, the box is not placed).
+    # ALWAYS     - on every right click, the box can never be placed by hand.
+    # SMART      - while sneaking: always. While not sneaking: only in the air and on
+    #              non-interactable blocks (chests, doors, furnaces stay vanilla).
+    open_method: SHIFT
+
+    title: " #f5e6ff{shulker_name} " # GUI title. HEX colors supported
+    # Placeholders: {shulker_name} - display name of the item or its material name
+
+    prevent_nested: true # Prohibit putting a shulker box inside another shulker box
+    save_interval: 10 # Ticks between automatic saves while the GUI is open (20 = 1s)
+
+    blacklist: # Items that cannot be put into a shulker box (bypass: neyshulker.bypass.blacklist)
+      enabled: true
+      items:
+        - "BEDROCK"
+        - "BARRIER"
+        - "COMMAND_BLOCK"
+        - "CHAIN_COMMAND_BLOCK"
+        - "REPEATING_COMMAND_BLOCK"
+        - "STRUCTURE_BLOCK"
+        - "JIGSAW"
+        - "SPAWNER"
+        - "END_PORTAL_FRAME"
+        - "DEBUG_STICK"
+
+  auto_collect:
+    enabled: true # Suck nearby items into a free shulker box in the inventory
+    permission_required: false # true - only players with neyshulker.autocollect collect items
+    check_interval: 20 # Ticks between scans (20 = 1s). Lower = faster, heavier
+    max_distance: 3.0 # Pickup radius in blocks
+    only_when_inventory_full: true # Collect only when the player inventory has no free slot
+    max_items_per_tick: 8 # Anti-lag: max items collected per scan per player
+    collect_shulker_boxes: false # NEVER enable this unless you know what you are doing
+    ignore_pickup_delay: false # true - also collect items that still have a pickup delay
+    messages: false # Report what was collected into the chat
+
+    priority_items: # Collected first (most valuable items get into the box first)
+      - "NETHERITE_INGOT"
+      - "NETHERITE_SCRAP"
+      - "ANCIENT_DEBRIS"
+      - "DIAMOND"
+      - "EMERALD"
+      - "GOLD_INGOT"
+      - "IRON_INGOT"
+
+    blacklist: # These items are never collected
+      - "BEDROCK"
+      - "BARRIER"
+      - "COMMAND_BLOCK"
+      - "STRUCTURE_BLOCK"
+      - "JIGSAW"
+      - "SPAWNER"
+
+messages:
+  enabled: true # Master switch for all plugin messages
+  prefix: "&#b388ffNeyShulker &8» &7" # Added in front of every message (empty = disabled)
+
+  no_permission:
+    enabled: true
+    text: "&#ff6b6bYou do not have permission to do this."
+
+  player_only:
+    enabled: true
+    text: "&#ff6b6bThis command is available to players only."
+
+  usage:
+    enabled: true
+    text: "&#8ce0ffUsage: &f/shulker <reload|open|info|autocollect>"
+
+  open_error:
+    enabled: true
+    text: "&#ff6b6bFailed to open this shulker box."
+
+  blacklisted:
+    enabled: true
+    text: "&#ff6b6bThis item cannot be placed into a shulker box."
+
+  nested_shulker:
+    enabled: true
+    text: "&#ff6b6bA shulker box cannot be placed into another shulker box."
+
+  self_remove:
+    enabled: true
+    text: "&#ff6b6bYou cannot take the opened shulker box away."
+
+  move_blocked:
+    enabled: true
+    text: "&#ff6b6bThe opened shulker box cannot be moved."
+
+  drop_blocked:
+    enabled: true
+    text: "&#ff6b6bThe opened shulker box cannot be dropped."
+
+  swap_blocked:
+    enabled: true
+    text: "&#ff6b6bThe opened shulker box cannot be swapped."
+
+  no_space:
+    enabled: true
+    text: "&#ffe066The shulker box is full."
+
+  saved:
+    enabled: false
+    text: "&#9dff8cThe contents of the shulker box have been saved."
+
+  auto_collect:
+    enabled: true
+    text: "&#8ce0ffCollected items: &f{amount}"
+
+  auto_collect_full:
+    enabled: true
+    text: "&#ffe066The shulker box is full, cannot collect items."
+
+  auto_collect_no_shulker:
+    enabled: false
+    text: "&#ffe066No free shulker box found in your inventory."
+
+  auto_collect_on:
+    enabled: true
+    text: "&#9dff8cAuto-collect enabled."
+
+  auto_collect_off:
+    enabled: true
+    text: "&#ffe066Auto-collect disabled."
+
+  reload:
+    enabled: true
+    text: "&#9dff8cConfiguration reloaded."
+
+sounds:
+  enabled: true
+  open:
+    sound: BLOCK_SHULKER_BOX_OPEN
+    volume: 1.0
+    pitch: 1.0
+  close:
+    sound: BLOCK_SHULKER_BOX_CLOSE
+    volume: 1.0
+    pitch: 1.0
+  collect:
+    sound: ENTITY_ITEM_PICKUP
+    volume: 0.5
+    pitch: 1.2
+
+permissions:
+  enabled: false # Enable the permission system (all checks below become active)
+  use: "neyshulker.use" # Open a shulker box
+  auto_collect: "neyshulker.autocollect" # Auto-collect (hang it on a donor rank)
+  bypass_blacklist: "neyshulker.bypass.blacklist" # Ignore the item blacklist
+  reload: "neyshulker.reload" # /shulker reload

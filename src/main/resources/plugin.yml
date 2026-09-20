@@ -1,0 +1,43 @@
+name: NeyShulker
+version: '${project.version}'
+main: eu.neydev.neyshulker.NeyShulker
+api-version: '1.20'
+author: Ney
+description: Portable shulker boxes with anti-dupe protection and auto-collect
+softdepend: [PlaceholderAPI]
+
+# Runtime-библиотеки: скачиваются в plugins/NeyShulker/libs при первом запуске,
+# проверяются по SHA-1 и подключаются в classloader. Jar плагина их не содержит.
+# Формат: groupId:artifactId:version[@repository][#sha1]
+# На Paper секция загружается ядром нативно, NeyShulker подхватывает только пропущенное.
+libraries: []
+#  - "com.zaxxer:HikariCP:5.1.0"
+#  - "org.example:my-lib:1.2.3@https://repo.example.org/maven2/#0123456789abcdef0123456789abcdef01234567"
+
+commands:
+  shulker:
+    description: NeyShulker control command
+    usage: /shulker <reload|open|info|autocollect>
+    aliases: [sh, neyshulker]
+
+permissions:
+  neyshulker.use:
+    description: Open a shulker box from the inventory
+    default: true
+  neyshulker.autocollect:
+    description: Auto-collect nearby items into shulker boxes
+    default: true
+  neyshulker.bypass.blacklist:
+    description: Bypass the item blacklist
+    default: false
+  neyshulker.reload:
+    description: Reload the plugin configuration
+    default: op
+  neyshulker.admin:
+    description: All NeyShulker permissions
+    default: op
+    children:
+      neyshulker.use: true
+      neyshulker.autocollect: true
+      neyshulker.bypass.blacklist: true
+      neyshulker.reload: true

@@ -1,0 +1,245 @@
+package eu.neydev.neyshulker.command;
+
+import eu.neydev.neyshulker.NeyShulker;
+import eu.neydev.neyshulker.config.type.MessageKey;
+import eu.neydev.neyshulker.config.type.PermissionNode;
+import eu.neydev.neyshulker.dependency.DependencyLoader;
+import eu.neydev.neyshulker.model.ShulkerSession;
+import eu.neydev.neyshulker.service.AutoCollectService;
+import eu.neydev.neyshulker.service.MessageService;
+import eu.neydev.neyshulker.service.PermissionService;
+import eu.neydev.neyshulker.service.ShulkerOpenService;
+import eu.neydev.neyshulker.util.ShulkerUtil;
+import org.bukkit.command.Command;
+import org.bukkit.command.CommandSender;
+import org.bukkit.command.TabExecutor;
+import org.bukkit.entity.Player;
+import org.bukkit.inventory.ItemStack;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+
+/**
+ * Команда /shulker: перезагрузка конфигурации, открытие шалкер-бокса,
+ * информация о текущей сессии и переключение автосбора.
+ */
+public class ShulkerCommand implements TabExecutor {
+
+    private final NeyShulker plugin;
+    private final PermissionService permissionService;
+    private final MessageService messageService;
+    private final ShulkerOpenService openService;
+    private final AutoCollectService autoCollectService;
+
+    public ShulkerCommand(@NotNull NeyShulker plugin) {
+
+        this.plugin = plugin;
+        this.permissionService = plugin.getServices().getPermissionService();
+        this.messageService = plugin.getServices().getMessageService();
+        this.openService = plugin.getServices().getOpenService();
+        this.autoCollectService = plugin.getServices().getAutoCollectService();
+
+    }
+
+    @Override
+    public boolean onCommand(@NotNull CommandSender sender,
+                             @NotNull Command command,
+                             @NotNull String label,
+                             String @NotNull [] args) {
+
+        if (args.length == 0) {
+            messageService.send(sender, MessageKey.USAGE, Map.of());
+            return true;
+        }
+
+        switch (args[0].toLowerCase(Locale.ROOT)) {
+
+            case "reload" -> handleReload(sender);
+
+            case "open" -> handleOpen(sender);
+
+            case "info" -> handleInfo(sender);
+
+            case "autocollect" -> handleAutoCollect(sender);
+
+            case "libs" -> handleLibs(sender);
+
+            default -> messageService.send(sender, MessageKey.USAGE, Map.of());
+
+        }
+
+        return true;
+
+    }
+
+    @Override
+    public @Nullable List<String> onTabComplete(@NotNull CommandSender sender,
+                                                @NotNull Command command,
+                                                @NotNull String alias,
+                                                String @NotNull [] args) {
+
+        if (args.length == 1) {
+            return filter(List.of("reload", "open", "info", "autocollect", "libs"), args[0]);
+        }
+
+        return List.of();
+
+    }
+
+    // --- Обработчики ---
+
+    private void handleReload(@NotNull CommandSender sender) {
+
+        if (!permissionService.has(sender, PermissionNode.RELOAD)) {
+            messageService.send(sender, MessageKey.NO_PERMISSION, Map.of());
+            return;
+        }
+
+        plugin.getConfigManager().reload();
+
+        messageService.send(sender, MessageKey.RELOAD, Map.of());
+
+    }
+
+    private void handleOpen(@NotNull CommandSender sender) {
+
+        if (!(sender instanceof Player player)) {
+            messageService.send(sender, MessageKey.PLAYER_ONLY, Map.of());
+            return;
+        }
+
+        if (!permissionService.has(player, PermissionNode.USE)) {
+            messageService.send(player, MessageKey.NO_PERMISSION);
+            return;
+        }
+
+        int slot = player.getInventory().getHeldItemSlot();
+        ItemStack item = player.getInventory().getItem(slot);
+
+        if (!ShulkerUtil.isShulkerBox(item)) {
+            messageService.send(player, MessageKey.OPEN_ERROR);
+            return;
+        }
+
+        if (!openService.open(player, item, slot)) {
+            messageService.send(player, MessageKey.OPEN_ERROR);
+        }
+
+    }
+
+    private void handleInfo(@NotNull CommandSender sender) {
+
+        if (!(sender instanceof Player player)) {
+            messageService.send(sender, MessageKey.PLAYER_ONLY, Map.of());
+            return;
+        }
+
+        ShulkerSession session = plugin.getServices().getSessionRegistry().getSession(player);
+
+        if (session == null) {
+
+            boolean autoCollectActive = plugin.getConfigManager().isAutoCollectEnabled()
+                    && autoCollectService.isEnabledFor(player);
+
+            messageService.sendRaw(player, "&7Открытых шалкер-боксов нет.");
+            messageService.sendRaw(player, "&7Автосбор: " + state(autoCollectActive));
+
+            return;
+
+        }
+
+        ItemStack shulker = session.shulkerItem();
+        int freeSlots = ShulkerUtil.countFreeSlots(shulker);
+
+        messageService.sendRaw(player, "&dШалкер: &f" + session.getShulkerName());
+        messageService.sendRaw(player, "&dСлот: &f" + session.getSlot());
+        messageService.sendRaw(player, "&dСвободно слотов: &f" + freeSlots + "&7/&f"
+                + ShulkerUtil.SHULKER_SIZE);
+        messageService.sendRaw(player, "&dПредметов внутри: &f" + ShulkerUtil.countItems(shulker));
+        messageService.sendRaw(player, "&dОткрыт: &f"
+                + (System.currentTimeMillis() - session.openedAt()) / 1000L + "&7 сек.");
+
+    }
+
+    private void handleAutoCollect(@NotNull CommandSender sender) {
+
+        if (!(sender instanceof Player player)) {
+            messageService.send(sender, MessageKey.PLAYER_ONLY, Map.of());
+            return;
+        }
+
+        if (!permissionService.has(player, PermissionNode.AUTO_COLLECT)) {
+            messageService.send(player, MessageKey.NO_PERMISSION);
+            return;
+        }
+
+        boolean enabled = autoCollectService.toggle(player);
+
+        messageService.send(player, enabled ? MessageKey.AUTO_COLLECT_ON : MessageKey.AUTO_COLLECT_OFF);
+
+    }
+
+    private void handleLibs(@NotNull CommandSender sender) {
+
+        List<DependencyLoader.LoadResult> results = plugin.getDependencyLoader().getResults();
+
+        if (results.isEmpty()) {
+
+            messageService.sendRaw(sender instanceof Player
+                    ? (Player) sender : null, "&7Runtime-библиотеки не объявлены.");
+
+            return;
+        }
+
+        for (DependencyLoader.LoadResult result : results) {
+            messageService.sendRaw(asPlayer(sender), statePrefix(result.state())
+                    + result.coordinates() + " &8- &7" + result.details());
+        }
+
+    }
+
+    private @Nullable Player asPlayer(@NotNull CommandSender sender) {
+        return sender instanceof Player player ? player : null;
+    }
+
+    private @NotNull String statePrefix(@NotNull DependencyLoader.LoadState state) {
+
+        return switch (state) {
+
+            case INJECTED -> "&a[+] ";
+
+            case INJECTED_ISOLATED -> "&e[~] ";
+
+            case FAILED -> "&c[-] ";
+
+        };
+
+    }
+
+    // --- Вспомогательные ---
+
+    private @NotNull List<String> filter(@NotNull List<String> source, @NotNull String token) {
+
+        String prefix = token.toLowerCase(Locale.ROOT);
+        List<String> result = new ArrayList<>();
+
+        for (String value : source) {
+
+            if (value.toLowerCase(Locale.ROOT).startsWith(prefix)) {
+                result.add(value);
+            }
+
+        }
+
+        return result;
+
+    }
+
+    private @NotNull String state(boolean enabled) {
+        return enabled ? "&aвключен" : "&cвыключен";
+    }
+}
