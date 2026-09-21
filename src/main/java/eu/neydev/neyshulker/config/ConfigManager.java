@@ -7,7 +7,7 @@ import eu.neydev.neyshulker.config.type.OpenMethodType;
 import eu.neydev.neyshulker.config.type.PermissionNode;
 import eu.neydev.neyshulker.config.type.SoundKey;
 import eu.neydev.neyshulker.config.type.SoundSettings;
-import eu.neydev.neyshulker.config.type.InventoryCollectMode;
+import eu.neydev.neyshulker.config.type.CollectMode;
 import eu.neydev.neyshulker.config.type.TitleMode;
 import eu.neydev.neyshulker.service.ConsoleService;
 import eu.neydev.neyshulker.util.HexColorUtil;
@@ -43,11 +43,9 @@ public class ConfigManager implements NeyShulkerConfig {
 
     private FileConfiguration config;
 
-    // --- Общие пути ---
 
     private static final String PATH_ENABLED = "settings.enabled";
 
-    // --- Шалкер-бокс ---
 
     private static final String PATH_OPEN_METHOD = "settings.shulker.open_method";
     private static final String PATH_TITLE = "settings.shulker.title";
@@ -57,33 +55,32 @@ public class ConfigManager implements NeyShulkerConfig {
     private static final String PATH_BLACKLIST_ENABLED = "settings.shulker.blacklist.enabled";
     private static final String PATH_BLACKLIST_ITEMS = "settings.shulker.blacklist.items";
 
-    // --- Автосбор ---
 
     private static final String PATH_AUTO_COLLECT_ENABLED = "settings.auto_collect.enabled";
-    private static final String PATH_AUTO_COLLECT_INTERVAL = "settings.auto_collect.scan.interval";
     private static final String PATH_AUTO_COLLECT_DISTANCE = "settings.auto_collect.scan.distance";
-    private static final String PATH_AUTO_COLLECT_MAX_ITEMS = "settings.auto_collect.scan.limit";
+    private static final String PATH_WAVE_PERIOD = "settings.auto_collect.waves.period";
+    private static final String PATH_WAVE_PLAYERS = "settings.auto_collect.waves.players_per_wave";
+    private static final String PATH_WAVE_ACTIONS = "settings.auto_collect.waves.actions_per_wave";
+    private static final String PATH_WAVE_QUEUE = "settings.auto_collect.waves.queue_per_player";
     private static final String PATH_AUTO_COLLECT_ONLY_FULL = "settings.auto_collect.rules.only_full_inventory";
     private static final String PATH_AUTO_COLLECT_MERGE = "settings.auto_collect.rules.merge_into_existing";
-    private static final String PATH_AUTO_COLLECT_INV_MODE = "settings.auto_collect.inventory.mode";
+    private static final String PATH_AUTO_COLLECT_MODE = "settings.auto_collect.mode";
     private static final String PATH_AUTO_COLLECT_IGNORE_DELAY = "settings.auto_collect.rules.ignore_pickup_delay";
     private static final String PATH_AUTO_COLLECT_PERMISSION = "settings.auto_collect.permission.required";
     private static final String PATH_AUTO_COLLECT_MESSAGES = "settings.auto_collect.feedback.messages";
     private static final String PATH_AUTO_COLLECT_PRIORITY = "settings.auto_collect.priority_items";
     private static final String PATH_AUTO_COLLECT_BLACKLIST = "settings.auto_collect.blacklist";
 
-    // --- Сообщения, звуки, права ---
 
     private static final String PATH_MESSAGES_ENABLED = "messages.enabled";
     private static final String PATH_MESSAGE_PREFIX = "messages.prefix";
     private static final String PATH_PERMISSIONS_ENABLED = "permissions.enabled";
+    private static final String PATH_PERMISSION_OP_BYPASS = "permissions.op_bypass";
 
-    // --- Ограничения значений ---
 
     private static final int MIN_INTERVAL_TICKS = 1;
     private static final double MIN_DISTANCE = 0.0D;
 
-    // --- Значения по умолчанию ---
 
     private static final Set<Material> DEFAULT_BLACKLIST = EnumSet.of(
             Material.BEDROCK, Material.BARRIER, Material.COMMAND_BLOCK,
@@ -102,7 +99,6 @@ public class ConfigManager implements NeyShulkerConfig {
             Material.DIAMOND, Material.EMERALD, Material.GOLD_INGOT, Material.IRON_INGOT
     );
 
-    // --- Кэш ---
 
     private boolean pluginEnabled;
 
@@ -115,12 +111,14 @@ public class ConfigManager implements NeyShulkerConfig {
 
     private boolean autoCollectEnabled;
     private boolean autoCollectPermissionRequired;
-    private int autoCollectInterval;
     private double autoCollectMaxDistance;
+    private int wavePeriod;
+    private int wavePlayers;
+    private int waveActions;
+    private int waveQueue;
     private boolean autoCollectOnlyWhenInventoryFull;
     private boolean autoCollectMergeIntoExisting;
-    private InventoryCollectMode autoCollectInventoryMode;
-    private int autoCollectMaxItemsPerTick;
+    private CollectMode autoCollectMode;
     private boolean autoCollectIgnorePickupDelay;
     private boolean autoCollectMessages;
     private List<Material> autoCollectPriorityItems;
@@ -133,6 +131,7 @@ public class ConfigManager implements NeyShulkerConfig {
     private final Map<SoundKey, SoundSettings> sounds = new EnumMap<>(SoundKey.class);
 
     private boolean permissionsEnabled;
+    private boolean permissionOpBypass;
     private final Map<PermissionNode, String> permissions = new EnumMap<>(PermissionNode.class);
 
     public ConfigManager(NeyShulker plugin, ConsoleService consoleService) {
@@ -221,13 +220,28 @@ public class ConfigManager implements NeyShulkerConfig {
     }
 
     @Override
-    public int getAutoCollectInterval() {
-        return autoCollectInterval;
+    public double getAutoCollectMaxDistance() {
+        return autoCollectMaxDistance;
     }
 
     @Override
-    public double getAutoCollectMaxDistance() {
-        return autoCollectMaxDistance;
+    public int getWavePeriod() {
+        return wavePeriod;
+    }
+
+    @Override
+    public int getPlayersPerWave() {
+        return wavePlayers;
+    }
+
+    @Override
+    public int getActionsPerWave() {
+        return waveActions;
+    }
+
+    @Override
+    public int getQueuePerPlayer() {
+        return waveQueue;
     }
 
     @Override
@@ -241,13 +255,8 @@ public class ConfigManager implements NeyShulkerConfig {
     }
 
     @Override
-    public InventoryCollectMode getAutoCollectInventoryMode() {
-        return autoCollectInventoryMode;
-    }
-
-    @Override
-    public int getAutoCollectMaxItemsPerTick() {
-        return autoCollectMaxItemsPerTick;
+    public CollectMode getAutoCollectMode() {
+        return autoCollectMode;
     }
 
     @Override
@@ -320,11 +329,15 @@ public class ConfigManager implements NeyShulkerConfig {
     }
 
     @Override
+    public boolean isPermissionOpBypass() {
+        return permissionOpBypass;
+    }
+
+    @Override
     public String getPermission(PermissionNode node) {
         return permissions.getOrDefault(node, node.getDefaultPermission());
     }
 
-    // --- Загрузка ---
 
     private void saveDefaultConfig() {
         plugin.saveDefaultConfig();
@@ -362,15 +375,19 @@ public class ConfigManager implements NeyShulkerConfig {
 
         autoCollectEnabled = config.getBoolean(PATH_AUTO_COLLECT_ENABLED, true);
         autoCollectPermissionRequired = config.getBoolean(PATH_AUTO_COLLECT_PERMISSION, false);
-        autoCollectInterval = intOrWarn(config.getInt(PATH_AUTO_COLLECT_INTERVAL, 20),
-                PATH_AUTO_COLLECT_INTERVAL, MIN_INTERVAL_TICKS);
         autoCollectMaxDistance = doubleOrWarn(config.getDouble(PATH_AUTO_COLLECT_DISTANCE, 4.5D),
                 PATH_AUTO_COLLECT_DISTANCE, MIN_DISTANCE);
+        wavePeriod = intOrWarn(config.getInt(PATH_WAVE_PERIOD, 10),
+                PATH_WAVE_PERIOD, MIN_INTERVAL_TICKS);
+        wavePlayers = intOrWarn(config.getInt(PATH_WAVE_PLAYERS, 5),
+                PATH_WAVE_PLAYERS, MIN_INTERVAL_TICKS);
+        waveActions = intOrWarn(config.getInt(PATH_WAVE_ACTIONS, 16),
+                PATH_WAVE_ACTIONS, MIN_INTERVAL_TICKS);
+        waveQueue = intOrWarn(config.getInt(PATH_WAVE_QUEUE, 32),
+                PATH_WAVE_QUEUE, MIN_INTERVAL_TICKS);
         autoCollectOnlyWhenInventoryFull = config.getBoolean(PATH_AUTO_COLLECT_ONLY_FULL, false);
         autoCollectMergeIntoExisting = config.getBoolean(PATH_AUTO_COLLECT_MERGE, true);
-        autoCollectInventoryMode = parseInventoryCollectMode();
-        autoCollectMaxItemsPerTick = intOrWarn(config.getInt(PATH_AUTO_COLLECT_MAX_ITEMS, 8),
-                PATH_AUTO_COLLECT_MAX_ITEMS, MIN_INTERVAL_TICKS);
+        autoCollectMode = parseCollectMode();
         autoCollectIgnorePickupDelay = config.getBoolean(PATH_AUTO_COLLECT_IGNORE_DELAY, false);
         autoCollectMessages = config.getBoolean(PATH_AUTO_COLLECT_MESSAGES, false);
         autoCollectBlacklist = readMaterials(PATH_AUTO_COLLECT_BLACKLIST, DEFAULT_AUTO_COLLECT_BLACKLIST);
@@ -412,6 +429,7 @@ public class ConfigManager implements NeyShulkerConfig {
     private void cachePermissions() {
 
         permissionsEnabled = config.getBoolean(PATH_PERMISSIONS_ENABLED, false);
+        permissionOpBypass = config.getBoolean(PATH_PERMISSION_OP_BYPASS, false);
         permissions.clear();
 
         for (PermissionNode node : PermissionNode.values()) {
@@ -421,30 +439,32 @@ public class ConfigManager implements NeyShulkerConfig {
 
     }
 
-    // --- Чтение значений с валидацией ---
 
     /**
      * Читает режим досортировки инвентаря; при некорректном значении - MATCHING.
      *
      * @return режим источника "инвентарь"
      */
-    private @NotNull InventoryCollectMode parseInventoryCollectMode() {
+    /**
+     * Читает глобальный режим автосбора; при некорректном значении - ALL.
+     *
+     * @return режим обоих источников сбора
+     */
+    private @NotNull CollectMode parseCollectMode() {
 
-        String configValue = config.getString(PATH_AUTO_COLLECT_INV_MODE,
-                InventoryCollectMode.MATCHING.name());
-
-        InventoryCollectMode parsed = InventoryCollectMode.fromString(configValue, null);
+        String configValue = config.getString(PATH_AUTO_COLLECT_MODE, CollectMode.ALL.name());
+        CollectMode parsed = CollectMode.fromString(configValue, null);
 
         if (parsed != null) {
             return parsed;
         }
 
         consoleService.log(ConsoleMessage.INVALID_VALUE,
-                "path", PATH_AUTO_COLLECT_INV_MODE,
-                "value", String.valueOf(configValue),
-                "defaultValue", InventoryCollectMode.MATCHING.name());
+                "path", PATH_AUTO_COLLECT_MODE,
+                "value", configValue,
+                "defaultValue", CollectMode.ALL.name());
 
-        return InventoryCollectMode.MATCHING;
+        return CollectMode.ALL;
 
     }
 
@@ -470,7 +490,7 @@ public class ConfigManager implements NeyShulkerConfig {
 
         consoleService.log(ConsoleMessage.INVALID_VALUE,
                 "path", PATH_TITLE_MODE,
-                "value", String.valueOf(configValue),
+                "value", configValue,
                 "defaultValue", TitleMode.CUSTOM.name());
 
         return TitleMode.CUSTOM;
@@ -514,7 +534,7 @@ public class ConfigManager implements NeyShulkerConfig {
 
         consoleService.log(ConsoleMessage.INVALID_VALUE,
                 "path", PATH_OPEN_METHOD,
-                "value", String.valueOf(configValue),
+                "value", configValue,
                 "defaultValue", OpenMethodType.AIR.name());
 
         return OpenMethodType.AIR;

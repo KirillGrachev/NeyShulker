@@ -9,7 +9,6 @@ import eu.neydev.neyshulker.util.ShulkerUtil;
 import eu.neydev.neyshulker.service.MessageService;
 import eu.neydev.neyshulker.service.ShulkerOpenService;
 import eu.neydev.neyshulker.service.ShulkerValidationService;
-import eu.neydev.neyshulker.util.ShulkerUtil;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;

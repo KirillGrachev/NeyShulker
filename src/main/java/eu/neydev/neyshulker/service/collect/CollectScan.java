@@ -1,6 +1,7 @@
 package eu.neydev.neyshulker.service.collect;
 
 import eu.neydev.neyshulker.config.ConfigManager;
+import eu.neydev.neyshulker.config.type.CollectMode;
 import eu.neydev.neyshulker.model.ShulkerSession;
 import eu.neydev.neyshulker.service.InventoryTransferService;
 import eu.neydev.neyshulker.service.ShulkerPersistenceService;
@@ -65,33 +66,28 @@ public final class CollectScan {
     }
 
     /**
-     * Подбирает цель под конкретный дроп: сначала бокс с частичным стеком
-     * того же типа (режим merge_into_existing), затем бокс со свободным слотом.
+     * Подбирает цель под предмет с учетом глобального режима автосбора.
      *
-     * @param stack дроп
-     * @return цель или null, если места нет
+     * Порядок выбора: бокс с частичным стеком того же типа (компактация),
+     * затем бокс со свободным слотом, предпочтительно уже хранящий тип.
+     * MATCHING гейтует допуск для обоих источников: тип обязан быть уже
+     * известным какому-то приемнику; полные стеки типа не блокируют сбор,
+     * пока есть свободные слоты.
+     *
+     * @param stack предмет
+     * @return цель или null, если допуска или места нет
      */
     public @Nullable CollectTarget targetFor(@NotNull ItemStack stack) {
-        return targetFor(stack, false);
-    }
 
-    /**
-     * Цель для дропа; mergeOnly требует, чтобы тип уже присутствовал
-     * в приемнике (режим досортировки MATCHING).
-     *
-     * @param stack    предмет
-     * @param mergeOnly только приемники, уже содержащие этот тип
-     * @return цель или null
-     */
-    public @Nullable CollectTarget targetFor(@NotNull ItemStack stack, boolean mergeOnly) {
+        CollectMode mode = configManager.getAutoCollectMode();
 
         if (sessionTarget != null) {
 
-            if (!mergeOnly || sessionHoldsType(stack)) {
-                return sessionTarget;
+            if (mode == CollectMode.MATCHING && !sessionHoldsType(stack)) {
+                return null;
             }
 
-            return null;
+            return sessionTarget;
 
         }
 
@@ -109,26 +105,38 @@ public final class CollectScan {
 
         }
 
-        if (mergeOnly) {
+        boolean typeKnown = mode != CollectMode.MATCHING || holdsType(stack);
+
+        if (!typeKnown) {
             return null;
         }
+
+        BoxCollectTarget anyFree = null;
 
         for (Integer slot : order) {
 
             BoxCollectTarget target = boxes.get(slot);
 
-            if (ShulkerUtil.countFreeSlots(contentsOf(target)) > 0) {
+            if (ShulkerUtil.countFreeSlots(contentsOf(target)) <= 0) {
+                continue;
+            }
+
+            if (mode == CollectMode.MATCHING && holdsTypeIn(target, stack)) {
                 return target;
+            }
+
+            if (anyFree == null) {
+                anyFree = target;
             }
 
         }
 
-        return null;
+        return anyFree;
 
     }
 
     /**
-     * Есть ли в открытом GUI предмет того же типа (для MATCHING-досортировки).
+     * Есть ли в открытом GUI предмет того же типа (MATCHING-гейт источника).
      */
     private boolean sessionHoldsType(@NotNull ItemStack stack) {
 
@@ -137,6 +145,37 @@ public final class CollectScan {
         for (int i = 0; i < inventory.getSize(); i++) {
 
             ItemStack slot = inventory.getItem(i);
+
+            if (slot != null && slot.isSimilar(stack)) {
+                return true;
+            }
+
+        }
+
+        return false;
+
+    }
+
+    /**
+     * Известен ли тип предмета какому-либо приемнику скана.
+     */
+    private boolean holdsType(@NotNull ItemStack stack) {
+
+        for (BoxCollectTarget target : boxes.values()) {
+
+            if (holdsTypeIn(target, stack)) {
+                return true;
+            }
+
+        }
+
+        return false;
+
+    }
+
+    private boolean holdsTypeIn(@NotNull BoxCollectTarget target, @NotNull ItemStack stack) {
+
+        for (ItemStack slot : contentsOf(target)) {
 
             if (slot != null && slot.isSimilar(stack)) {
                 return true;
@@ -174,7 +213,6 @@ public final class CollectScan {
 
     }
 
-    // --- Построение кэша боксов ---
 
     private void buildBoxes() {
 

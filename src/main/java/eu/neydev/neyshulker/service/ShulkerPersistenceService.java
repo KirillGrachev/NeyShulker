@@ -7,10 +7,10 @@ import eu.neydev.neyshulker.model.ShulkerSession;
 import eu.neydev.neyshulker.registry.SessionRegistry;
 import eu.neydev.neyshulker.util.ShulkerUtil;
 import org.bukkit.Bukkit;
+import org.bukkit.Material;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.PlayerInventory;
-import org.bukkit.Material;
 import org.bukkit.scheduler.BukkitTask;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -20,15 +20,14 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * Сервис сохранения содержимого обратно в предмет шалкер-бокса.
+ * Сервис сохранения содержимого открытого шалкер-бокса обратно в предмет.
  *
  * Ключевые решения текущей реализации, которые закрывают дюп
  * (legacy-код FunnyShulker базовой линией не считается):
  * 1. Сохранение выполняется строго в главном потоке - никаких гонок с кликами.
- * 2. Перед записью слот проверяется: если шалкер-бокс исчез или заменен,
- *    содержимое возвращается в первый свободный слот, а не теряется.
+ * 2. Перед записью слот проверяется: если бокс исчез или заменен,
+ *    содержимое не воссоздается из пустоты - сессия открепляется.
  * 3. Флаг saving исключает повторный вход и параллельные записи.
- * 4. Сообщение о сохранении отправляется только при реальном изменении.
  */
 public class ShulkerPersistenceService {
 
@@ -88,8 +87,6 @@ public class ShulkerPersistenceService {
             return false;
         }
 
-        long stamp = session.getModificationStamp();
-
         try {
 
             ItemStack[] contents = contentService.snapshot(session.inventory());
@@ -116,7 +113,7 @@ public class ShulkerPersistenceService {
             writeBack(player, slot, saved);
 
             if (notify) {
-                messageService.send(player, MessageKey.SAVED, Map.of());
+                messageService.send(player, MessageKey.SAVED);
             }
 
             return true;
@@ -136,7 +133,7 @@ public class ShulkerPersistenceService {
     }
 
     /**
-     * Помечает сессию измененной и планирует сохранение на следующем тике.
+     * Помечает сессию измененной и планирует сохранение на следующий тик.
      * Повторные вызовы в пределах одного тика схлопываются в одно сохранение.
      *
      * @param session изменяемая сессия
@@ -224,23 +221,9 @@ public class ShulkerPersistenceService {
     }
 
     /**
-     * Синхронно сохраняет все открытые сессии.
-     * Используется при выключении плагина.
-     */
-    public void persistAll() {
-
-        for (ShulkerSession session : sessionRegistry.getSessions()) {
-            persist(session, false);
-        }
-
-    }
-
-    /**
      * Открепляет сессию, у которой бокс исчез из слота.
-     *
-     * Выполняется ровно один раз: предупреждение в консоль, остановка
-     * автосохранения и закрытие GUI. Дальнейшие сохранения молча выходят,
-     * поэтому консоль не spam-ится одним и тем же состоянием каждые полсекунды.
+     * Выполняется ровно один раз; консольных уведомлений нет по решению
+     * владельца плагина.
      */
     private void detach(@NotNull Player player, @NotNull ShulkerSession session) {
 
@@ -250,8 +233,7 @@ public class ShulkerPersistenceService {
 
         cancelAutoSave(session);
 
-        // Слушатель закрытия снимет сессию и раздаст закрывающие события;
-        // консольных уведомлений о detach нет по решению владельца плагина
+        // Слушатель закрытия снимет сессию и раздаст закрывающие события
         player.closeInventory();
 
     }

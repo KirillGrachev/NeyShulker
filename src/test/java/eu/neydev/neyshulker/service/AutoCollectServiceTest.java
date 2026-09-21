@@ -108,11 +108,11 @@ class AutoCollectServiceTest {
         when(configManager.isAutoCollectPermissionRequired()).thenReturn(false);
         when(configManager.isAutoCollectOnlyWhenInventoryFull()).thenReturn(false);
         when(configManager.isAutoCollectMergeIntoExisting()).thenReturn(true);
-        when(configManager.getAutoCollectInventoryMode())
-                .thenReturn(eu.neydev.neyshulker.config.type.InventoryCollectMode.MATCHING);
+        when(configManager.getAutoCollectMode())
+                .thenReturn(eu.neydev.neyshulker.config.type.CollectMode.ALL);
         when(configManager.getAutoCollectMaxDistance()).thenReturn(3.0D);
         when(configManager.isAutoCollectIgnorePickupDelay()).thenReturn(false);
-        when(configManager.getAutoCollectMaxItemsPerTick()).thenReturn(8);
+        when(configManager.getQueuePerPlayer()).thenReturn(64);
         when(configManager.isAutoCollectBlacklisted(any())).thenReturn(false);
         when(configManager.isBlacklistEnabled()).thenReturn(false);
         when(configManager.getAutoCollectPriorityItems()).thenReturn(List.of());
@@ -224,13 +224,18 @@ class AutoCollectServiceTest {
         when(playerInventory.getItem(0)).thenReturn(shulker);
         when(playerInventory.getContents()).thenReturn(new ItemStack[]{shulker});
 
+        AutoCollectService service = service();
+
+        when(configManager.getAutoCollectMode())
+                .thenReturn(eu.neydev.neyshulker.config.type.CollectMode.MATCHING);
+
         PluginManager pluginManager = mock(PluginManager.class);
 
         try (MockedStatic<Bukkit> bukkit = mockStatic(Bukkit.class)) {
 
             bukkit.when(Bukkit::getPluginManager).thenReturn(pluginManager);
 
-            service().collectAround(player);
+            service.collectAround(player);
 
         }
 
@@ -474,6 +479,51 @@ class AutoCollectServiceTest {
     }
 
     @Test
+    @DisplayName("MATCHING: полные стеки типа не блокируют сбор при свободных слотах")
+    void matchingFullStacksDoNotBlockWhenFreeSlotsExist() {
+
+        ItemStack[] boxStacks = new ItemStack[ShulkerUtil.SHULKER_SIZE];
+
+        for (int i = 0; i < boxStacks.length; i++) {
+            boxStacks[i] = new FakeItemStack(Material.COBBLESTONE, 64);
+        }
+
+        boxStacks[5] = null;
+        boxStacks[6] = null;
+
+        when(boxContents.getContents()).thenReturn(boxStacks);
+        when(playerInventory.getItem(0)).thenReturn(shulker);
+        when(playerInventory.getContents()).thenReturn(new ItemStack[]{shulker});
+
+        playerInventory.setItem(9, new FakeItemStack(Material.COBBLESTONE, 4));
+
+        AutoCollectService service = service();
+
+        when(configManager.getAutoCollectMode())
+                .thenReturn(eu.neydev.neyshulker.config.type.CollectMode.MATCHING);
+
+        org.bukkit.World world = mock(org.bukkit.World.class);
+
+        when(world.getEntitiesByClass(Item.class)).thenReturn(List.of());
+        when(player.getWorld()).thenReturn(world);
+
+        PluginManager pluginManager = mock(PluginManager.class);
+
+        try (MockedStatic<Bukkit> bukkit = mockStatic(Bukkit.class)) {
+
+            bukkit.when(Bukkit::getPluginManager).thenReturn(pluginManager);
+
+            service.collectAround(player);
+
+        }
+
+        assertEquals(null, playerInventory.getItem(9),
+                "Тип уже в боксе - свободные слоты принимают его даже при полных стеках");
+        assertEquals(4, boxContents.getItem(5).getAmount());
+
+    }
+
+    @Test
     @DisplayName("ALL: любой допустимый предмет из инвентаря уходит в бокс")
     void inventoryAllMovesAnyEligible() {
 
@@ -490,8 +540,8 @@ class AutoCollectServiceTest {
         when(world.getEntitiesByClass(Item.class)).thenReturn(List.of());
         when(player.getWorld()).thenReturn(world);
 
-        when(configManager.getAutoCollectInventoryMode())
-                .thenReturn(eu.neydev.neyshulker.config.type.InventoryCollectMode.ALL);
+        when(configManager.getAutoCollectMode())
+                .thenReturn(eu.neydev.neyshulker.config.type.CollectMode.ALL);
 
         PluginManager pluginManager = mock(PluginManager.class);
 
@@ -509,8 +559,8 @@ class AutoCollectServiceTest {
     }
 
     @Test
-    @DisplayName("OFF: инвентарь не трогается")
-    void inventoryOffLeavesInventory() {
+    @DisplayName("MATCHING: неизвестный тип не собирается ни с земли, ни из инвентаря")
+    void matchingIgnoresUnknownTypesEverywhere() {
 
         when(boxContents.getContents()).thenReturn(new ItemStack[ShulkerUtil.SHULKER_SIZE]);
         when(playerInventory.getItem(0)).thenReturn(shulker);
@@ -520,16 +570,25 @@ class AutoCollectServiceTest {
 
         AutoCollectService service = service();
 
+        when(configManager.getAutoCollectMode())
+                .thenReturn(eu.neydev.neyshulker.config.type.CollectMode.MATCHING);
+
         org.bukkit.World world = mock(org.bukkit.World.class);
 
-        when(world.getEntitiesByClass(Item.class)).thenReturn(List.of());
+        when(world.getEntitiesByClass(Item.class)).thenReturn(List.of(drop));
         when(player.getWorld()).thenReturn(world);
 
-        when(configManager.getAutoCollectInventoryMode())
-                .thenReturn(eu.neydev.neyshulker.config.type.InventoryCollectMode.OFF);
+        PluginManager pluginManager = mock(PluginManager.class);
 
-        service.collectAround(player);
+        try (MockedStatic<Bukkit> bukkit = mockStatic(Bukkit.class)) {
 
+            bukkit.when(Bukkit::getPluginManager).thenReturn(pluginManager);
+
+            service.collectAround(player);
+
+        }
+
+        verify(drop, never()).remove();
         assertNotNull(playerInventory.getItem(6));
 
     }

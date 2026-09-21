@@ -17,31 +17,13 @@ import org.jetbrains.annotations.NotNull;
 public class ShulkerInventoryHolder implements InventoryHolder {
 
     private final Inventory inventory;
-    private final String title;
 
     public ShulkerInventoryHolder(@NotNull String title) {
-
-        this.title = title;
         this.inventory = Bukkit.createInventory(this, ShulkerUtil.SHULKER_SIZE, title);
-
     }
 
     @Override
     public @NotNull Inventory getInventory() {
         return inventory;
-    }
-
-    public @NotNull String getTitle() {
-        return title;
-    }
-
-    /**
-     * Проверяет, что инвентарь принадлежит плагину.
-     *
-     * @param inventory проверяемый инвентарь
-     * @return true если это GUI шалкер-бокса NeyShulker
-     */
-    public static boolean isShulkerInventory(Inventory inventory) {
-        return inventory != null && inventory.getHolder() instanceof ShulkerInventoryHolder;
     }
 }

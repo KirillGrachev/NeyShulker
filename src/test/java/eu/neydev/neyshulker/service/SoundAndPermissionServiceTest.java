@@ -62,6 +62,35 @@ class SoundAndPermissionServiceTest {
     }
 
     @Test
+    @DisplayName("op_bypass: OP и консоль игнорируют проверки прав")
+    void opBypassIgnoresChecks() {
+
+        when(configManager.arePermissionsEnabled()).thenReturn(true);
+        when(configManager.isPermissionOpBypass()).thenReturn(true);
+        when(configManager.getPermission(PermissionNode.RELOAD)).thenReturn("neyshulker.reload");
+
+        PermissionService permissionService = new PermissionService(configManager);
+
+        Player op = mock(Player.class);
+        when(op.isOp()).thenReturn(true);
+
+        org.bukkit.command.ConsoleCommandSender console =
+                mock(org.bukkit.command.ConsoleCommandSender.class);
+
+        org.junit.jupiter.api.Assertions.assertTrue(
+                permissionService.has(op, PermissionNode.RELOAD));
+        org.junit.jupiter.api.Assertions.assertTrue(
+                permissionService.has(console, PermissionNode.RELOAD));
+        org.junit.jupiter.api.Assertions.assertTrue(permissionService.canBypassBlacklist(op));
+
+        when(configManager.isPermissionOpBypass()).thenReturn(false);
+
+        org.junit.jupiter.api.Assertions.assertFalse(
+                permissionService.has(op, PermissionNode.RELOAD));
+
+    }
+
+    @Test
     @DisplayName("Выключенная система прав разрешает все")
     void disabledPermissionsAllowEverything() {
 

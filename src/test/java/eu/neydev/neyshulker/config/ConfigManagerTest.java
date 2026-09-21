@@ -126,8 +126,12 @@ class ConfigManagerTest {
                   auto_collect:
                     enabled: false
                     scan:
-                      interval: 40
                       distance: 5.5
+                    waves:
+                      period: 40
+                      players_per_wave: 3
+                      actions_per_wave: 7
+                      queue_per_player: 9
                     permission:
                       required: true
                     priority_items:
@@ -157,7 +161,10 @@ class ConfigManagerTest {
 
         assertFalse(config.isAutoCollectEnabled());
         assertTrue(config.isAutoCollectPermissionRequired());
-        assertEquals(40, config.getAutoCollectInterval());
+        assertEquals(40, config.getWavePeriod());
+        assertEquals(3, config.getPlayersPerWave());
+        assertEquals(7, config.getActionsPerWave());
+        assertEquals(9, config.getQueuePerPlayer());
         assertEquals(5.5D, config.getAutoCollectMaxDistance());
         assertEquals(java.util.List.of(Material.EMERALD), config.getAutoCollectPriorityItems());
 

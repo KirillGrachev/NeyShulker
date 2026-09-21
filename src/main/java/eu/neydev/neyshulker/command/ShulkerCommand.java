@@ -87,7 +87,6 @@ public class ShulkerCommand implements TabExecutor {
 
     }
 
-    // --- Обработчики ---
 
     private void handleReload(@NotNull CommandSender sender) {
 
@@ -192,7 +191,6 @@ public class ShulkerCommand implements TabExecutor {
         return sender instanceof Player player ? player : null;
     }
 
-    // --- Вспомогательные ---
 
     private @NotNull List<String> filter(@NotNull List<String> source, @NotNull String token) {
 

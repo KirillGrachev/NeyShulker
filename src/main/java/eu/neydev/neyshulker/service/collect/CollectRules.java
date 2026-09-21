@@ -59,31 +59,28 @@ public final class CollectRules {
     }
 
     /**
-     * Допустим ли предмет для сбора в шалкер.
+     * Исключен ли предмет из сбора.
      *
      * @param player игрок (для проверки bypass-права)
      * @param stack  предмет дропа
-     * @return true если предмет можно положить
+     * @return true если предмет собирать нельзя
      */
-    public boolean isCollectable(@NotNull Player player, @NotNull ItemStack stack) {
+    public boolean isExcluded(@NotNull Player player, @NotNull ItemStack stack) {
 
         Material material = stack.getType();
 
         // Шалкер в шалкере не поддерживается: авто-сбор тоже не трогает боксы
         if (ShulkerUtil.isShulkerBox(stack)) {
-            return false;
+            return true;
         }
 
         if (configManager.isAutoCollectBlacklisted(material)) {
-            return false;
+            return true;
         }
 
-        if (configManager.isBlacklistEnabled() && configManager.isBlacklisted(material)
-                && !permissionService.canBypassBlacklist(player)) {
-            return false;
-        }
-
-        return true;
+        return configManager.isBlacklistEnabled()
+                && configManager.isBlacklisted(material)
+                && !permissionService.canBypassBlacklist(player);
 
     }
 

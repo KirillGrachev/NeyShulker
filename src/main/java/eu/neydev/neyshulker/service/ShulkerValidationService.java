@@ -40,7 +40,6 @@ public class ShulkerValidationService {
      * @param player       игрок
      * @param item         предмет в руке
      * @param action       действие взаимодействия
-     * @param clickedBlock блок, по которому кликнули (может быть null)
      * @return результат проверки
      */
     public @NotNull ValidationResult canOpen(@NotNull Player player,

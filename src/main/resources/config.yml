@@ -37,12 +37,22 @@ settings:
 
   auto_collect:
     enabled: true # Suck nearby items into a free shulker box in the inventory
+    mode: ALL # One gate for both sources (ground drops and inventory sorting):
+      # ALL      - vacuum every eligible item within the radius and sort the
+      #            whole inventory into the boxes
+      # MATCHING - only types already present in a box or in the open GUI;
+      #            an empty box stays idle until filled by hand
 
     scan:
-      interval: 20 # Ticks between scans (20 = 1s). Lower = faster, heavier
       distance: 4.5 # Pickup radius in blocks; mining reach is ~4.5, so smaller
         # radii leave half the drops behind when farming blocks ahead of you
-      limit: 8 # Anti-lag: max items collected per scan per player
+
+    waves:
+      period: 10 # Ticks between waves (10 = 2 scans per second)
+      players_per_wave: 5 # Players detected per wave, round robin: the load per
+        # wave stays constant no matter how many players are online
+      actions_per_wave: 16 # Global insert budget per wave across all players
+      queue_per_player: 32 # Waitlist size per player; overflow is re-detected later
 
     rules:
       only_full_inventory: false # true - collect only when the player
@@ -51,14 +61,6 @@ settings:
         # drops of types it already holds, merging into partial stacks
       ignore_pickup_delay: false # true - also collect items that still have a
         # pickup delay (fresh drops wait ~0.5s before the auto-collect may touch them)
-
-    inventory:
-      mode: MATCHING # Items that vanilla pickup already delivered into the
-        # player inventory are sorted into the boxes as well:
-        # OFF      - do not touch the inventory, ground drops only
-        # MATCHING - only move types already present in a box (safe sorting)
-        # ALL      - move every eligible item with space available;
-        #            the inventory works as a transit buffer
 
     permission:
       required: false # true - only players with neyshulker.autocollect collect items
@@ -185,6 +187,7 @@ messages:
 
 permissions:
   enabled: false # Enable the permission system (all checks below become active)
+  op_bypass: false # OP players and console ignore permission checks
   use: "neyshulker.use" # Open a shulker box
   auto_collect: "neyshulker.autocollect" # Auto-collect (hang it on a donor rank)
   bypass_blacklist: "neyshulker.bypass.blacklist" # Ignore the item blacklist

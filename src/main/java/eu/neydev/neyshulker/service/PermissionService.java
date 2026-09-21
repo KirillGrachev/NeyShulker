@@ -3,6 +3,7 @@ package eu.neydev.neyshulker.service;
 import eu.neydev.neyshulker.config.ConfigManager;
 import eu.neydev.neyshulker.config.type.PermissionNode;
 import org.bukkit.command.CommandSender;
+import org.bukkit.command.ConsoleCommandSender;
 import org.bukkit.entity.Player;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -26,14 +27,15 @@ public class PermissionService {
      * @param node   узел права
      * @return true если действие разрешено
      */
+    /**
+     * Проверяет наличие права у игрока.
+     *
+     * @param player проверяемый игрок
+     * @param node   узел права
+     * @return true если действие разрешено
+     */
     public boolean has(@Nullable Player player, @NotNull PermissionNode node) {
-
-        if (!configManager.arePermissionsEnabled()) {
-            return true;
-        }
-
-        return player != null && player.hasPermission(configManager.getPermission(node));
-
+        return has((CommandSender) player, node);
     }
 
     /**
@@ -49,7 +51,31 @@ public class PermissionService {
             return true;
         }
 
-        return sender != null && sender.hasPermission(configManager.getPermission(node));
+        if (sender == null) {
+            return false;
+        }
+
+        if (configManager.isPermissionOpBypass()
+                && (sender.isOp() || sender instanceof ConsoleCommandSender)) {
+            return true;
+        }
+
+        return sender.hasPermission(configManager.getPermission(node));
+
+    }
+
+    /**
+     * Попадает ли отправитель под op-bypass: OP-игроки и консоль
+     * игнорируют проверки прав при включенном permissions.op_bypass.
+     *
+     * @param sender отправитель
+     * @return true если проверки прав для него не действуют
+     */
+    private boolean isOpBypass(@Nullable CommandSender sender) {
+
+        return configManager.isPermissionOpBypass()
+                && sender != null
+                && (sender.isOp() || sender instanceof ConsoleCommandSender);
 
     }
 
@@ -67,6 +93,10 @@ public class PermissionService {
 
         if (!configManager.arePermissionsEnabled()) {
             return false;
+        }
+
+        if (isOpBypass(player)) {
+            return true;
         }
 
         return player != null

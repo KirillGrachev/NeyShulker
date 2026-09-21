@@ -4,7 +4,7 @@ import eu.neydev.neyshulker.config.type.MessageKey;
 import eu.neydev.neyshulker.config.type.OpenMethodType;
 import eu.neydev.neyshulker.config.type.PermissionNode;
 import eu.neydev.neyshulker.config.type.SoundSettings;
-import eu.neydev.neyshulker.config.type.InventoryCollectMode;
+import eu.neydev.neyshulker.config.type.CollectMode;
 import eu.neydev.neyshulker.config.type.TitleMode;
 import org.bukkit.Material;
 
@@ -17,11 +17,9 @@ import java.util.Set;
  */
 public interface NeyShulkerConfig {
 
-    // --- Общие настройки ---
 
     boolean isPluginEnabled();
 
-    // --- Шалкер-бокс ---
 
     OpenMethodType getOpenMethod();
 
@@ -37,23 +35,26 @@ public interface NeyShulkerConfig {
 
     boolean isBlacklisted(Material material);
 
-    // --- Автосбор ---
 
     boolean isAutoCollectEnabled();
 
     boolean isAutoCollectPermissionRequired();
 
-    int getAutoCollectInterval();
-
     double getAutoCollectMaxDistance();
+
+    int getWavePeriod();
+
+    int getPlayersPerWave();
+
+    int getActionsPerWave();
+
+    int getQueuePerPlayer();
 
     boolean isAutoCollectOnlyWhenInventoryFull();
 
     boolean isAutoCollectMergeIntoExisting();
 
-    InventoryCollectMode getAutoCollectInventoryMode();
-
-    int getAutoCollectMaxItemsPerTick();
+    CollectMode getAutoCollectMode();
 
     boolean isAutoCollectIgnorePickupDelay();
 
@@ -65,7 +66,6 @@ public interface NeyShulkerConfig {
 
     boolean isAutoCollectBlacklisted(Material material);
 
-    // --- Сообщения ---
 
     boolean areMessagesEnabled();
 
@@ -73,7 +73,6 @@ public interface NeyShulkerConfig {
 
     List<String> getMessages(MessageKey key);
 
-    // --- Звуки ---
 
     SoundSettings getOpenSound();
 
@@ -81,9 +80,10 @@ public interface NeyShulkerConfig {
 
     SoundSettings getCollectSound();
 
-    // --- Права ---
 
     boolean arePermissionsEnabled();
+
+    boolean isPermissionOpBypass();
 
     String getPermission(PermissionNode node);
 
