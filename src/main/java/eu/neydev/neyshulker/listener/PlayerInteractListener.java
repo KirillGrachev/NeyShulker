@@ -4,6 +4,8 @@ import eu.neydev.neyshulker.NeyShulker;
 import eu.neydev.neyshulker.config.ConfigManager;
 import eu.neydev.neyshulker.config.type.MessageKey;
 import eu.neydev.neyshulker.model.ValidationResult;
+import eu.neydev.neyshulker.registry.SessionRegistry;
+import eu.neydev.neyshulker.util.ShulkerUtil;
 import eu.neydev.neyshulker.service.MessageService;
 import eu.neydev.neyshulker.service.ShulkerOpenService;
 import eu.neydev.neyshulker.service.ShulkerValidationService;
@@ -33,6 +35,7 @@ public class PlayerInteractListener implements Listener {
     private final ShulkerValidationService validationService;
     private final ShulkerOpenService openService;
     private final MessageService messageService;
+    private final SessionRegistry sessionRegistry;
 
     public PlayerInteractListener(@NotNull NeyShulker plugin) {
 
@@ -41,10 +44,17 @@ public class PlayerInteractListener implements Listener {
         this.validationService = plugin.getServices().getValidationService();
         this.openService = plugin.getServices().getOpenService();
         this.messageService = plugin.getServices().getMessageService();
+        this.sessionRegistry = plugin.getServices().getSessionRegistry();
 
     }
 
-    @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
+    /**
+     * Открытие GUI не изменяет мир, поэтому клик читается даже когда интеракт
+     * отменен другим плагином (регионы, античит, vanish): ignoreCancelled
+     * здесь заставил бы молча проглатывать такие клики, и открытие по воздуху
+     * "ломалось" на серверах с защитой.
+     */
+    @EventHandler(priority = EventPriority.HIGH)
     public void onPlayerInteract(@NotNull PlayerInteractEvent event) {
 
         if (!isOpeningAction(event)) {
@@ -53,16 +63,26 @@ public class PlayerInteractListener implements Listener {
 
         Player player = event.getPlayer();
 
+        // Живая сессия: второе открытие (вторая рука, повторный клик) молча игнорируем
+        if (sessionRegistry.hasSession(player.getUniqueId())) {
+            return;
+        }
+
         // Предмет на курсоре означает незавершенное действие с инвентарем:
         // открытие GUI в этот момент приводит к рассинхрону окна у клиента
         if (!ShulkerUtil.isEmpty(player.getItemOnCursor())) {
             return;
         }
 
-        ItemStack item = player.getInventory().getItemInMainHand();
+        boolean mainHand = event.getHand() == EquipmentSlot.HAND;
+        ItemStack item = mainHand
+                ? player.getInventory().getItemInMainHand()
+                : player.getInventory().getItemInOffHand();
+        int slot = mainHand
+                ? player.getInventory().getHeldItemSlot()
+                : ShulkerUtil.OFF_HAND_SLOT;
 
-        ValidationResult result = validationService.canOpen(player, item,
-                event.getAction(), event.getClickedBlock());
+        ValidationResult result = validationService.canOpen(player, item, event.getAction());
 
         // Режим не совпал или предмет не шалкер - отдаем обработку ванили
         if (!result.isAllowed() && result.getMessageKey() == null) {
@@ -78,7 +98,6 @@ public class PlayerInteractListener implements Listener {
 
         // GUI открывается на следующем тике: событие взаимодействия должно
         // полностью завершиться, иначе клиент может получить рассинхрон окна
-        int slot = player.getInventory().getHeldItemSlot();
         ItemStack shulker = item.clone();
 
         Bukkit.getScheduler().runTask(plugin, () -> {
@@ -101,7 +120,8 @@ public class PlayerInteractListener implements Listener {
             return false;
         }
 
-        if (event.getHand() != EquipmentSlot.HAND) {
+        // Поддерживаются обе руки: предмет и слот выбираются по event.getHand()
+        if (event.getHand() == null) {
             return false;
         }
 

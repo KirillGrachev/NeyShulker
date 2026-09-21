@@ -7,10 +7,10 @@ import eu.neydev.neyshulker.model.ShulkerSession;
 import eu.neydev.neyshulker.model.ValidationResult;
 import eu.neydev.neyshulker.registry.SessionRegistry;
 import eu.neydev.neyshulker.util.ShulkerUtil;
-import org.bukkit.block.Block;
 import org.bukkit.entity.Player;
 import org.bukkit.event.block.Action;
 import org.bukkit.inventory.ItemStack;
+import org.bukkit.inventory.PlayerInventory;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -45,8 +45,7 @@ public class ShulkerValidationService {
      */
     public @NotNull ValidationResult canOpen(@NotNull Player player,
                                              @Nullable ItemStack item,
-                                             @NotNull Action action,
-                                             @Nullable Block clickedBlock) {
+                                             @NotNull Action action) {
 
         if (!configManager.isPluginEnabled()) {
             return ValidationResult.denied(ValidationReason.PLUGIN_DISABLED);
@@ -64,7 +63,7 @@ public class ShulkerValidationService {
             return ValidationResult.denied(ValidationReason.BLACKLISTED);
         }
 
-        if (!matchesOpenMethod(player, action, clickedBlock)) {
+        if (!matchesOpenMethod(player, action)) {
             return ValidationResult.denied(ValidationReason.METHOD_MISMATCH);
         }
 
@@ -95,11 +94,9 @@ public class ShulkerValidationService {
                 return ValidationResult.denied(ValidationReason.OPEN_SHULKER);
             }
 
-            if (configManager.isNestedPrevented()) {
-                return ValidationResult.denied(ValidationReason.NESTED_SHULKER);
-            }
-
-            return ValidationResult.allowed();
+            // Шалкер в шалкере не поддерживается вовсе: содержимое внутреннего
+            // бокса недоступно ни игроку, ни плагину, пока жив внешний
+            return ValidationResult.denied(ValidationReason.NESTED_SHULKER);
 
         }
 
@@ -132,6 +129,60 @@ public class ShulkerValidationService {
     }
 
     /**
+     * Проверяет, пытается ли игрок выбросить или обменять открытый шалкер-бокс.
+     *
+     * Опознавание идет по слоту сессии и типу материала, а не по isSimilar:
+     * сохранения перезаписывают содержимое предмета, и сравнение меты
+     * переставало узнавать собственный бокс - на этом строился дюп через Q.
+     *
+     * @param player игрок
+     * @return true если в руке игрока лежит открытый шалкер-бокс
+     */
+    public boolean isHeldOpenShulker(@NotNull Player player) {
+
+        ShulkerSession session = sessionRegistry.getSession(player);
+
+        if (session == null) {
+            return false;
+        }
+
+        PlayerInventory inventory = player.getInventory();
+
+        if (inventory.getHeldItemSlot() != session.getSlot()) {
+            return false;
+        }
+
+        return ShulkerUtil.isShulkerBox(inventory.getItem(session.getSlot()));
+
+    }
+
+    /**
+     * Проверяет, заденет ли обмен руками (F) открытый шалкер-бокс.
+     * Обмен всегда затрагивает вторую руку, поэтому сессия во второй руке
+     * блокируется целиком, а сессия в основной - только когда бокс в ней.
+     *
+     * @param player игрок
+     * @return true если обмен нужно отменить
+     */
+    public boolean isSwapTouchingOpenShulker(@NotNull Player player) {
+
+        ShulkerSession session = sessionRegistry.getSession(player);
+
+        if (session == null) {
+            return false;
+        }
+
+        PlayerInventory inventory = player.getInventory();
+
+        if (session.getSlot() == ShulkerUtil.OFF_HAND_SLOT) {
+            return ShulkerUtil.isShulkerBox(inventory.getItem(ShulkerUtil.OFF_HAND_SLOT));
+        }
+
+        return isHeldOpenShulker(player);
+
+    }
+
+    /**
      * Проверяет, указывает ли слот на сам открытый шалкер-бокс.
      *
      * @param session      сессия игрока
@@ -155,16 +206,19 @@ public class ShulkerValidationService {
 
     /**
      * Сверяет клик с настроенным способом открытия.
-     * SHIFT - единственный режим, при котором шалкер можно свободно ставить:
-     * крадущийся игрок не размещает блок.
+     *
+     * AIR и SMART держат клики по блокам ванильными, поэтому установка
+     * шалкера работает всегда; SHIFT требует явный модификатор.
      */
-    private boolean matchesOpenMethod(@NotNull Player player,
-                                      @NotNull Action action,
-                                      @Nullable Block clickedBlock) {
+    private boolean matchesOpenMethod(@NotNull Player player, @NotNull Action action) {
 
         boolean sneaking = player.isSneaking();
+        boolean rightClickAir = action == Action.RIGHT_CLICK_AIR;
 
         return switch (configManager.getOpenMethod()) {
+
+            // По воздуху нет ванильного взаимодействия - открытие ничего не крадет
+            case AIR -> rightClickAir;
 
             case SHIFT -> sneaking;
 
@@ -172,24 +226,10 @@ public class ShulkerValidationService {
 
             case ALWAYS -> true;
 
-            case SMART -> sneaking || isOpenableWithoutSneak(action, clickedBlock);
+            // Shift - явный модификатор "нужен GUI", воздух - быстрый путь
+            case SMART -> sneaking || rightClickAir;
 
         };
-
-    }
-
-    private boolean isOpenableWithoutSneak(@NotNull Action action, @Nullable Block clickedBlock) {
-
-        if (action == Action.RIGHT_CLICK_AIR) {
-            return true;
-        }
-
-        if (action != Action.RIGHT_CLICK_BLOCK || clickedBlock == null) {
-            return false;
-        }
-
-        // Не мешаем ванильному взаимодействию: сундуки, двери, кнопки, столы и т.д.
-        return !clickedBlock.getType().isInteractable();
 
     }
 }

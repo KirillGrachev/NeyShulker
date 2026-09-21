@@ -12,12 +12,14 @@ import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
+import org.bukkit.event.inventory.ClickType;
 import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.event.inventory.InventoryDragEvent;
 import org.bukkit.event.player.PlayerDropItemEvent;
 import org.bukkit.event.player.PlayerSwapHandItemsEvent;
 import org.bukkit.inventory.ItemStack;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 /**
  * Слушатель-охранник открытого шалкер-бокса.
@@ -55,13 +57,50 @@ public class ShulkerGuardListener implements Listener {
             return;
         }
 
+        // 1b. Номер-клавиша меняет местами кликовый слот и слот хотбара:
+        //     при наведенном курсоре на GUI источник переноса - hotbarButton,
+        //     который не равен rawSlot и без этой проверки уходил бы в обход
+        if (event.getClick() == ClickType.NUMBER_KEY
+                && validationService.isShulkerSlot(session, event.getHotbarButton())) {
+            cancel(event, player, MessageKey.MOVE_BLOCKED);
+            return;
+        }
+
+        // Shift-клик тянет предмет из нижней клетки в GUI ванильным путем:
+        // источник проверяется здесь, иначе шалкер или черный список пролезали
+        // в обход кликовых проверок (включая слот второй руки)
+        if (event.isShiftClick()) {
+
+            int sourceSlot = ViewSlotUtil.bottomSlot(event.getView(), event.getRawSlot());
+
+            if (sourceSlot != ViewSlotUtil.OUTSIDE) {
+
+                ValidationResult enter =
+                        validationService.canEnterShulker(player, event.getCurrentItem());
+
+                if (!enter.isAllowed()) {
+                    cancel(event, player, enter);
+                    return;
+                }
+
+            }
+
+        }
+
         boolean clickInShulker = ViewSlotUtil.topSlot(event.getView(), event.getRawSlot())
                 != ViewSlotUtil.OUTSIDE;
 
-        // 2. Предмет на курсоре не может попасть внутрь
-        if (clickInShulker && isDisallowed(player, event.getCursor())) {
-            cancel(event, player, validationService.canEnterShulker(player, event.getCursor()));
-            return;
+        // 2. Предмет, входящий в GUI, не может быть запрещенным: курсор,
+        //    хотбар-слот номер-клавиши или вторая рука при SWAP_OFFHAND
+        if (clickInShulker) {
+
+            ItemStack entering = enteringItem(player, event);
+
+            if (isDisallowed(player, entering)) {
+                cancel(event, player, validationService.canEnterShulker(player, entering));
+                return;
+            }
+
         }
 
         // 3. Беремый предмет не может быть шалкер-боксом или запрещенным
@@ -106,12 +145,17 @@ public class ShulkerGuardListener implements Listener {
 
     }
 
+    /**
+     * Q выбрасывает предмет из выбранного слота хотбара - того самого,
+     * в котором лежит открытый бокс. Сравнение по isSimilar здесь неприменимо:
+     * после автосохранения мета предмета уже отличается от слепка сессии.
+     */
     @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
     public void onPlayerDropItem(@NotNull PlayerDropItemEvent event) {
 
         Player player = event.getPlayer();
 
-        if (validationService.isOpenShulker(player, event.getItemDrop().getItemStack())) {
+        if (validationService.isHeldOpenShulker(player)) {
             event.setCancelled(true);
             messageService.send(player, MessageKey.DROP_BLOCKED);
         }
@@ -123,7 +167,7 @@ public class ShulkerGuardListener implements Listener {
 
         Player player = event.getPlayer();
 
-        boolean touchesShulker = validationService.isOpenShulker(player, event.getMainHandItem())
+        boolean touchesShulker = validationService.isSwapTouchingOpenShulker(player)
                 || validationService.isOpenShulker(player, event.getOffHandItem());
 
         if (touchesShulker) {
@@ -149,6 +193,29 @@ public class ShulkerGuardListener implements Listener {
         int bottomSlot = ViewSlotUtil.bottomSlot(player.getOpenInventory(), rawSlot);
 
         return validationService.isShulkerSlot(session, bottomSlot);
+
+    }
+
+    /**
+     * Определяет предмет, который ваниль поместит в GUI этим кликом:
+     * курсор, источник номер-клавиши или вторая рука. Без этой проверки
+     * барьер и прочие черносписочные предметы пролетали в шалкер через
+     * NUMBER_KEY и SWAP_OFFHAND, минуя кликовые проверки.
+     */
+    private @Nullable ItemStack enteringItem(@NotNull Player player,
+                                             @NotNull InventoryClickEvent event) {
+
+        return switch (event.getClick()) {
+
+            case NUMBER_KEY -> event.getHotbarButton() >= 0
+                    ? player.getInventory().getItem(event.getHotbarButton())
+                    : null;
+
+            case SWAP_OFFHAND -> player.getInventory().getItemInOffHand();
+
+            default -> event.getCursor();
+
+        };
 
     }
 

@@ -3,6 +3,7 @@ package eu.neydev.neyshulker.event;
 import org.bukkit.entity.Item;
 import org.bukkit.entity.Player;
 import org.bukkit.event.Cancellable;
+import org.bukkit.event.HandlerList;
 import org.bukkit.inventory.ItemStack;
 import org.jetbrains.annotations.NotNull;
 
@@ -11,6 +12,8 @@ import org.jetbrains.annotations.NotNull;
  * Отмена события оставляет предмет лежать на земле.
  */
 public class ShulkerAutoCollectEvent extends NeyShulkerEvent implements Cancellable {
+
+    private static final HandlerList HANDLERS = new HandlerList();
 
     private final Player player;
     private final Item item;
@@ -52,5 +55,14 @@ public class ShulkerAutoCollectEvent extends NeyShulkerEvent implements Cancella
     @Override
     public void setCancelled(boolean cancelled) {
         this.cancelled = cancelled;
+    }
+
+    @Override
+    public @NotNull HandlerList getHandlers() {
+        return HANDLERS;
+    }
+
+    public static @NotNull HandlerList getHandlerList() {
+        return HANDLERS;
     }
 }

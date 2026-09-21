@@ -26,6 +26,7 @@ import java.util.concurrent.atomic.AtomicLong;
  * @param modified      счетчик изменений содержимого
  * @param saving        флаг выполняющегося сохранения (защита от повторного входа)
  * @param saveScheduled флаг запланированного сохранения
+ * @param detached      сессия откреплена: бокс покинул слот, записи больше не будет
  */
 public record ShulkerSession(
         @NotNull UUID sessionId,
@@ -36,7 +37,8 @@ public record ShulkerSession(
         @NotNull AtomicInteger slot,
         @NotNull AtomicLong modified,
         @NotNull AtomicBoolean saving,
-        @NotNull AtomicBoolean saveScheduled
+        @NotNull AtomicBoolean saveScheduled,
+        @NotNull AtomicBoolean detached
 ) {
 
     /**
@@ -64,6 +66,7 @@ public record ShulkerSession(
                 System.currentTimeMillis(),
                 new AtomicInteger(slot),
                 new AtomicLong(0L),
+                new AtomicBoolean(false),
                 new AtomicBoolean(false),
                 new AtomicBoolean(false)
         );
@@ -102,6 +105,19 @@ public record ShulkerSession(
 
     public @Nullable Player getPlayer() {
         return Bukkit.getPlayer(playerId);
+    }
+
+    /**
+     * Одноразово переводит сессию в открепленное состояние.
+     *
+     * @return true если открепление произошло сейчас, а не раньше
+     */
+    public boolean markDetached() {
+        return detached.compareAndSet(false, true);
+    }
+
+    public boolean isDetached() {
+        return detached.get();
     }
 
     public boolean isOnline() {

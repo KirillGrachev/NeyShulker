@@ -1,14 +1,13 @@
 package eu.neydev.neyshulker;
 
 import eu.neydev.neyshulker.command.ShulkerCommand;
-import eu.neydev.neyshulker.dependency.DependencyLoader;
 import eu.neydev.neyshulker.config.ConfigManager;
+import eu.neydev.neyshulker.service.ConsoleService;
 import eu.neydev.neyshulker.event.EventDispatcher;
 import eu.neydev.neyshulker.listener.PlayerInteractListener;
 import eu.neydev.neyshulker.listener.ShulkerCleanupListener;
 import eu.neydev.neyshulker.listener.ShulkerGuardListener;
 import eu.neydev.neyshulker.listener.ShulkerSyncListener;
-import eu.neydev.neyshulker.listener.ShulkerTransferListener;
 import eu.neydev.neyshulker.placeholder.NeyShulkerExpansion;
 import org.bukkit.command.PluginCommand;
 import org.bukkit.plugin.java.JavaPlugin;
@@ -16,7 +15,7 @@ import org.jetbrains.annotations.Nullable;
 
 public final class NeyShulker extends JavaPlugin {
 
-    private DependencyLoader dependencyLoader;
+    private ConsoleService consoleService;
     private ConfigManager configManager;
     private ServiceContainer services;
 
@@ -25,18 +24,14 @@ public final class NeyShulker extends JavaPlugin {
     @Override
     public void onEnable() {
 
-        // Runtime-библиотеки подключаются до инициализации сервисов
-        this.dependencyLoader = new DependencyLoader(this);
-        this.dependencyLoader.load();
-
-        this.configManager = new ConfigManager(this);
-        this.services = new ServiceContainer(this, configManager);
+        this.consoleService = new ConsoleService(this);
+        this.configManager = new ConfigManager(this, consoleService);
+        this.services = new ServiceContainer(this, configManager, consoleService);
 
         // Регистрация слушателей
         new EventDispatcher(this).registerEvents(
                 new PlayerInteractListener(this),
                 new ShulkerGuardListener(this),
-                new ShulkerTransferListener(this),
                 new ShulkerSyncListener(this),
                 new ShulkerCleanupListener(this)
         );
@@ -58,14 +53,13 @@ public final class NeyShulker extends JavaPlugin {
         services.getAutoCollectService().stop();
 
         unregisterExpansion();
-        dependencyLoader.close();
 
         getLogger().info("NeyShulker остановлен!");
 
     }
 
-    public DependencyLoader getDependencyLoader() {
-        return dependencyLoader;
+    public ConsoleService getConsoleService() {
+        return consoleService;
     }
 
     public ConfigManager getConfigManager() {

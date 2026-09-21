@@ -1,6 +1,7 @@
 package eu.neydev.neyshulker.service;
 
 import eu.neydev.neyshulker.config.ConfigManager;
+import eu.neydev.neyshulker.config.type.TitleMode;
 import org.bukkit.Material;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
@@ -38,10 +39,23 @@ class ShulkerTitleServiceTest {
     @DisplayName("Плейсхолдер имени подставляется с цветами")
     void substitutesNamePlaceholder() {
 
-        // ConfigManager кэширует заголовок уже с примененными цветами
-        when(configManager.getShulkerTitle()).thenReturn("§x§f§f§0§0§f§f{shulker_name}");
+        // ConfigManager кэширует шаблон уже с примененными цветами
+        when(configManager.getTitleMode()).thenReturn(TitleMode.CUSTOM);
+        when(configManager.getTitleFormat()).thenReturn("§x§f§f§0§0§f§f{shulker_name}");
 
         assertEquals("§x§f§f§0§0§f§f§cMy Box", titleService.resolve(namedShulker("§cMy Box")));
+
+    }
+
+    @Test
+    @DisplayName("ORIGINAL возвращает имя самого шалкера")
+    void originalModeUsesShulkerOwnName() {
+
+        when(configManager.getTitleMode()).thenReturn(TitleMode.ORIGINAL);
+        when(configManager.getTitleFormat()).thenReturn("ignored {shulker_name}");
+
+        assertEquals("§cMy Box", titleService.resolve(namedShulker("§cMy Box")));
+        assertEquals("White Shulker Box", titleService.resolve(namedShulker(null)));
 
     }
 
@@ -49,17 +63,19 @@ class ShulkerTitleServiceTest {
     @DisplayName("Без имени предмета используется имя материала")
     void fallsBackToMaterialName() {
 
-        when(configManager.getShulkerTitle()).thenReturn("{shulker_name}");
+        when(configManager.getTitleMode()).thenReturn(TitleMode.CUSTOM);
+        when(configManager.getTitleFormat()).thenReturn("{shulker_name}");
 
         assertEquals("White Shulker Box", titleService.resolve(namedShulker(null)));
 
     }
 
     @Test
-    @DisplayName("Пустой формат возвращает имя предмета")
+    @DisplayName("Пустой формат в CUSTOM возвращает имя предмета")
     void blankFormatReturnsName() {
 
-        when(configManager.getShulkerTitle()).thenReturn("  ");
+        when(configManager.getTitleMode()).thenReturn(TitleMode.CUSTOM);
+        when(configManager.getTitleFormat()).thenReturn("  ");
 
         assertEquals("§cMy Box", titleService.resolve(namedShulker("§cMy Box")));
 

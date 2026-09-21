@@ -8,6 +8,7 @@ import eu.neydev.neyshulker.model.ShulkerSession;
 import eu.neydev.neyshulker.registry.SessionRegistry;
 import eu.neydev.neyshulker.util.FakeItemStack;
 import eu.neydev.neyshulker.util.TestInventories;
+import org.bukkit.inventory.PlayerInventory;
 import org.bukkit.Material;
 import org.bukkit.entity.Player;
 import org.bukkit.event.block.Action;
@@ -50,7 +51,7 @@ class ShulkerValidationServiceTest {
         when(configManager.isPluginEnabled()).thenReturn(false);
 
         assertEquals(ValidationReason.PLUGIN_DISABLED,
-                validationService.canOpen(player, shulker(), Action.RIGHT_CLICK_AIR, null).reason());
+                validationService.canOpen(player, shulker(), Action.RIGHT_CLICK_AIR).reason());
 
     }
 
@@ -62,12 +63,12 @@ class ShulkerValidationServiceTest {
 
         assertEquals(ValidationReason.NOT_SHULKER,
                 validationService.canOpen(player, new FakeItemStack(Material.STONE, 1),
-                        Action.RIGHT_CLICK_AIR, null).reason());
+                        Action.RIGHT_CLICK_AIR).reason());
 
         when(permissionService.has(player, PermissionNode.USE)).thenReturn(false);
 
         assertEquals(ValidationReason.NO_PERMISSION,
-                validationService.canOpen(player, shulker(), Action.RIGHT_CLICK_AIR, null).reason());
+                validationService.canOpen(player, shulker(), Action.RIGHT_CLICK_AIR).reason());
 
     }
 
@@ -82,12 +83,12 @@ class ShulkerValidationServiceTest {
         when(permissionService.canBypassBlacklist(player)).thenReturn(false);
 
         assertEquals(ValidationReason.BLACKLISTED,
-                validationService.canOpen(player, shulker(), Action.RIGHT_CLICK_AIR, null).reason());
+                validationService.canOpen(player, shulker(), Action.RIGHT_CLICK_AIR).reason());
 
         when(permissionService.canBypassBlacklist(player)).thenReturn(true);
         when(configManager.getOpenMethod()).thenReturn(OpenMethodType.ALWAYS);
 
-        assertTrue(validationService.canOpen(player, shulker(), Action.RIGHT_CLICK_AIR, null).isAllowed());
+        assertTrue(validationService.canOpen(player, shulker(), Action.RIGHT_CLICK_AIR).isAllowed());
 
     }
 
@@ -101,42 +102,62 @@ class ShulkerValidationServiceTest {
 
         when(player.isSneaking()).thenReturn(false);
         assertEquals(ValidationReason.METHOD_MISMATCH,
-                validationService.canOpen(player, shulker(), Action.RIGHT_CLICK_AIR, null).reason());
+                validationService.canOpen(player, shulker(), Action.RIGHT_CLICK_AIR).reason());
 
         when(player.isSneaking()).thenReturn(true);
-        assertTrue(validationService.canOpen(player, shulker(), Action.RIGHT_CLICK_AIR, null).isAllowed());
+        assertTrue(validationService.canOpen(player, shulker(), Action.RIGHT_CLICK_AIR).isAllowed());
 
     }
 
     @Test
-    @DisplayName("SMART без Shift открывает только воздух")
-    void smartMethodOpensAirWithoutSneak() {
+    @DisplayName("AIR: воздух открывает, блоки остаются ванильными")
+    void airMethodOpensOnlyAir() {
+
+        when(configManager.isPluginEnabled()).thenReturn(true);
+        when(permissionService.has(player, PermissionNode.USE)).thenReturn(true);
+        when(configManager.getOpenMethod()).thenReturn(OpenMethodType.AIR);
+
+        when(player.isSneaking()).thenReturn(false);
+        assertTrue(validationService.canOpen(player, shulker(), Action.RIGHT_CLICK_AIR).isAllowed());
+        assertEquals(ValidationReason.METHOD_MISMATCH,
+                validationService.canOpen(player, shulker(), Action.RIGHT_CLICK_BLOCK).reason(),
+                "Клик по блоку не отменяется: установка шалкера работает");
+
+        when(player.isSneaking()).thenReturn(true);
+        assertTrue(validationService.canOpen(player, shulker(), Action.RIGHT_CLICK_AIR).isAllowed());
+        assertEquals(ValidationReason.METHOD_MISMATCH,
+                validationService.canOpen(player, shulker(), Action.RIGHT_CLICK_BLOCK).reason());
+
+    }
+
+    @Test
+    @DisplayName("SMART: Shift открывает везде, без Shift только воздух")
+    void smartMethodSneakAnywhereAirQuick() {
 
         when(configManager.isPluginEnabled()).thenReturn(true);
         when(permissionService.has(player, PermissionNode.USE)).thenReturn(true);
         when(configManager.getOpenMethod()).thenReturn(OpenMethodType.SMART);
-        when(player.isSneaking()).thenReturn(false);
 
-        assertTrue(validationService.canOpen(player, shulker(), Action.RIGHT_CLICK_AIR, null).isAllowed());
+        when(player.isSneaking()).thenReturn(false);
+        assertTrue(validationService.canOpen(player, shulker(), Action.RIGHT_CLICK_AIR).isAllowed());
         assertEquals(ValidationReason.METHOD_MISMATCH,
-                validationService.canOpen(player, shulker(), Action.RIGHT_CLICK_BLOCK, null).reason());
+                validationService.canOpen(player, shulker(), Action.RIGHT_CLICK_BLOCK).reason());
         assertEquals(ValidationReason.METHOD_MISMATCH,
-                validationService.canOpen(player, shulker(), Action.LEFT_CLICK_AIR, null).reason());
+                validationService.canOpen(player, shulker(), Action.LEFT_CLICK_AIR).reason());
+
+        when(player.isSneaking()).thenReturn(true);
+        assertTrue(validationService.canOpen(player, shulker(), Action.RIGHT_CLICK_BLOCK).isAllowed());
 
     }
 
     @Test
-    @DisplayName("Вложенный шалкер запрещен, если включен prevent_nested")
-    void nestedShulkerRule() {
+    @DisplayName("Шалкер в шалкере запрещен всегда, без тумблеров")
+    void nestedShulkerAlwaysDenied() {
 
-        ItemStack nested = shulker();
+        ItemStack nested = new FakeItemStack(Material.BLACK_SHULKER_BOX, 1);
 
-        when(configManager.isNestedPrevented()).thenReturn(true);
         assertEquals(ValidationReason.NESTED_SHULKER,
                 validationService.canEnterShulker(player, nested).reason());
-
-        when(configManager.isNestedPrevented()).thenReturn(false);
-        assertTrue(validationService.canEnterShulker(player, nested).isAllowed());
 
     }
 
@@ -151,13 +172,12 @@ class ShulkerValidationServiceTest {
                 () -> inventory, 3);
 
         when(sessionRegistry.getSession(player)).thenReturn(session);
-        when(configManager.isNestedPrevented()).thenReturn(false);
 
         assertEquals(ValidationReason.OPEN_SHULKER,
                 validationService.canEnterShulker(player, openItem).reason());
 
-        // Шалкер другого цвета не похож на открытый: вложенность выключена - можно
-        assertEquals(ValidationReason.NONE,
+        // Чужой бокс того же типа: не открытый, но вложенность запрещена всегда
+        assertEquals(ValidationReason.NESTED_SHULKER,
                 validationService.canEnterShulker(player,
                         new FakeItemStack(Material.BLACK_SHULKER_BOX, 1)).reason());
 
@@ -195,6 +215,46 @@ class ShulkerValidationServiceTest {
                 new FakeItemStack(Material.BLACK_SHULKER_BOX, 1)));
         assertFalse(validationService.isOpenShulker(player, new FakeItemStack(Material.STONE, 1)));
         assertFalse(validationService.isOpenShulker(player, null));
+
+    }
+
+    @Test
+    @DisplayName("Открытый бокс в руке узнается по слоту, а не по мете")
+    void detectsHeldOpenShulkerBySlot() {
+
+        PlayerInventory inventory = TestInventories.playerInventory();
+        ItemStack openItem = shulker();
+
+        when(player.getInventory()).thenReturn(inventory);
+        when(inventory.getHeldItemSlot()).thenReturn(4);
+        inventory.setItem(4, openItem);
+
+        ShulkerSession session = ShulkerSession.create(UUID.randomUUID(), player, openItem,
+                () -> inventory, 4);
+
+        when(sessionRegistry.getSession(player)).thenReturn(session);
+
+        assertTrue(validationService.isHeldOpenShulker(player),
+                "Бокс в слоте сессии должен узнаваться независимо от меты");
+
+        // Слот сессии пуст - значит бокс уже не там, защиту не включаем
+        inventory.setItem(4, null);
+        assertFalse(validationService.isHeldOpenShulker(player));
+
+        // Другой слот хотбара выбран - это не открытый бокс
+        inventory.setItem(4, openItem);
+        when(inventory.getHeldItemSlot()).thenReturn(7);
+        assertFalse(validationService.isHeldOpenShulker(player));
+
+    }
+
+    @Test
+    @DisplayName("Без сессии выброс не блокируется")
+    void noSessionNoBlock() {
+
+        when(sessionRegistry.getSession(player)).thenReturn(null);
+
+        assertFalse(validationService.isHeldOpenShulker(player));
 
     }
 

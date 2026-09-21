@@ -10,6 +10,7 @@ import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.PlayerInventory;
+import org.bukkit.Material;
 import org.bukkit.scheduler.BukkitTask;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -21,7 +22,8 @@ import java.util.concurrent.ConcurrentHashMap;
 /**
  * Сервис сохранения содержимого обратно в предмет шалкер-бокса.
  *
- * Ключевые отличия от наивной реализации, которые закрывают дюп:
+ * Ключевые решения текущей реализации, которые закрывают дюп
+ * (legacy-код FunnyShulker базовой линией не считается):
  * 1. Сохранение выполняется строго в главном потоке - никаких гонок с кликами.
  * 2. Перед записью слот проверяется: если шалкер-бокс исчез или заменен,
  *    содержимое возвращается в первый свободный слот, а не теряется.
@@ -77,6 +79,11 @@ public class ShulkerPersistenceService {
             return false;
         }
 
+        // Открепленная сессия молчалива: состояние уже обработано и закрыто
+        if (session.isDetached()) {
+            return false;
+        }
+
         if (!session.saving().compareAndSet(false, true)) {
             return false;
         }
@@ -92,18 +99,21 @@ public class ShulkerPersistenceService {
                 return false;
             }
 
-            int slot = resolveSlot(player, session, saved);
+            PlayerInventory inventory = player.getInventory();
+            int slot = resolveSlot(inventory, session.getSlot(), saved.getType());
 
             if (slot < 0) {
-                plugin.getLogger().warning("Не удалось сохранить шалкер-бокс игрока "
-                        + player.getName() + ": нет подходящего слота.");
+                detach(player, session);
                 return false;
             }
 
-            boolean relocated = slot != session.getSlot();
+            if (slot != session.getSlot()) {
+                // Бокс переехал внешним вмешательством: следуем за ним, а не
+                // воссоздаем вторую копию в осиротевшем слоте
+                session.setSlot(slot);
+            }
 
-            writeBack(player, slot, saved, relocated);
-            session.setSlot(slot);
+            writeBack(player, slot, saved);
 
             if (notify) {
                 messageService.send(player, MessageKey.SAVED, Map.of());
@@ -226,30 +236,61 @@ public class ShulkerPersistenceService {
     }
 
     /**
-     * Определяет слот для записи.
-     * Если исходный слот все еще занят шалкер-боксом того же типа - пишем туда,
-     * иначе ищем пустой слот, чтобы не затереть чужой предмет.
+     * Открепляет сессию, у которой бокс исчез из слота.
+     *
+     * Выполняется ровно один раз: предупреждение в консоль, остановка
+     * автосохранения и закрытие GUI. Дальнейшие сохранения молча выходят,
+     * поэтому консоль не spam-ится одним и тем же состоянием каждые полсекунды.
      */
-    private int resolveSlot(@NotNull Player player,
-                            @NotNull ShulkerSession session,
-                            @NotNull ItemStack saved) {
+    private void detach(@NotNull Player player, @NotNull ShulkerSession session) {
 
-        PlayerInventory inventory = player.getInventory();
-        int slot = session.getSlot();
+        if (!session.markDetached()) {
+            return;
+        }
 
-        if (slot >= 0 && slot < inventory.getSize()) {
+        cancelAutoSave(session);
 
-            ItemStack current = inventory.getItem(slot);
+        // Слушатель закрытия снимет сессию и раздаст закрывающие события;
+        // консольных уведомлений о detach нет по решению владельца плагина
+        player.closeInventory();
 
-            if (ShulkerUtil.isEmpty(current) || current.getType() == saved.getType()) {
-                return slot;
-            }
+    }
 
+    /**
+     * Определяет слот для записи.
+     *
+     * 1. Исходный слот все еще держит бокс того же типа - пишем туда.
+     * 2. Исходный слот пуст и бокс того же типа найден в инвентаре - бокс
+     *    переехал внешним вмешательством, следуем за ним (пере-якорение).
+     * 3. Иначе писать некуда: воссоздание предмета в пустом слоте дюпало
+     *    копией, пока оригинал лежал на земле.
+     *
+     * @param inventory инвентарь игрока
+     * @param slot      слот сессии
+     * @param savedType материал сохраняемого бокса
+     * @return слот для записи или -1, если писать некуда
+     */
+    static int resolveSlot(@NotNull PlayerInventory inventory, int slot, @NotNull Material savedType) {
+
+        if (slot < 0 || slot >= inventory.getSize()) {
+            return -1;
+        }
+
+        ItemStack current = inventory.getItem(slot);
+
+        if (current != null && current.getType() == savedType) {
+            return slot;
+        }
+
+        if (!ShulkerUtil.isEmpty(current)) {
+            return -1;
         }
 
         for (int i = 0; i < inventory.getSize(); i++) {
 
-            if (ShulkerUtil.isEmpty(inventory.getItem(i))) {
+            ItemStack candidate = inventory.getItem(i);
+
+            if (candidate != null && candidate.getType() == savedType) {
                 return i;
             }
 
@@ -261,14 +302,9 @@ public class ShulkerPersistenceService {
 
     private void writeBack(@NotNull Player player,
                            int slot,
-                           @NotNull ItemStack saved,
-                           boolean relocated) {
+                           @NotNull ItemStack saved) {
 
         player.getInventory().setItem(slot, saved);
-
-        if (relocated) {
-            player.updateInventory();
-        }
 
     }
 }

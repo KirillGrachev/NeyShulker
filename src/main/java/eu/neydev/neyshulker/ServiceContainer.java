@@ -1,6 +1,7 @@
 package eu.neydev.neyshulker;
 
 import eu.neydev.neyshulker.config.ConfigManager;
+import eu.neydev.neyshulker.service.ConsoleService;
 import eu.neydev.neyshulker.registry.SessionRegistry;
 import eu.neydev.neyshulker.service.AutoCollectService;
 import eu.neydev.neyshulker.service.InventoryTransferService;
@@ -23,6 +24,7 @@ public final class ServiceContainer {
 
     private final NeyShulker plugin;
     private final ConfigManager configManager;
+    private final ConsoleService consoleService;
 
     private final SessionRegistry sessionRegistry;
     private final MessageService messageService;
@@ -38,10 +40,12 @@ public final class ServiceContainer {
     private final ShulkerTransferService transferService;
     private final AutoCollectService autoCollectService;
 
-    public ServiceContainer(NeyShulker plugin, ConfigManager configManager) {
+    public ServiceContainer(NeyShulker plugin, ConfigManager configManager,
+                            ConsoleService consoleService) {
 
         this.plugin = plugin;
         this.configManager = configManager;
+        this.consoleService = consoleService;
 
         // Базовый слой
         this.sessionRegistry = new SessionRegistry();
@@ -63,8 +67,7 @@ public final class ServiceContainer {
                 titleService, persistenceService, messageService, soundService);
         this.closeService = new ShulkerCloseService(plugin, sessionRegistry,
                 persistenceService, soundService);
-        this.transferService = new ShulkerTransferService(configManager, sessionRegistry,
-                inventoryTransferService, persistenceService, messageService, soundService);
+        this.transferService = new ShulkerTransferService(sessionRegistry, persistenceService);
 
         // Фоновые задачи
         this.autoCollectService = new AutoCollectService(plugin, configManager, sessionRegistry,
@@ -79,6 +82,10 @@ public final class ServiceContainer {
 
     public ConfigManager getConfigManager() {
         return configManager;
+    }
+
+    public ConsoleService getConsoleService() {
+        return consoleService;
     }
 
     public SessionRegistry getSessionRegistry() {

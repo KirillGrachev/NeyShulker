@@ -32,12 +32,13 @@ class MessageServiceTest {
         when(configManager.areMessagesEnabled()).thenReturn(true);
         when(configManager.getMessagePrefix()).thenReturn("§8» §7");
         when(configManager.getMessages(MessageKey.AUTO_COLLECT))
-                .thenReturn(List.of("Collected: §f{amount}", ""));
+                .thenReturn(List.of("{prefix}Collected: §f{amount}", "without prefix", ""));
 
         List<String> lines = messageService.build(MessageKey.AUTO_COLLECT,
                 Map.of("amount", "5"));
 
-        assertEquals(List.of("§8» §7Collected: §f5", ""), lines);
+        // Префикс появляется только там, где его явно попросили
+        assertEquals(List.of("§8» §7Collected: §f5", "without prefix", ""), lines);
 
     }
 
@@ -50,7 +51,7 @@ class MessageServiceTest {
         when(player.isOnline()).thenReturn(true);
         when(configManager.areMessagesEnabled()).thenReturn(true);
         when(configManager.getMessagePrefix()).thenReturn("");
-        when(configManager.getMessages(MessageKey.RELOAD)).thenReturn(List.of("one", "two"));
+        when(configManager.getMessages(MessageKey.RELOAD)).thenReturn(List.of("one", "{prefix}two"));
 
         messageService.send(player, MessageKey.RELOAD);
 
@@ -100,7 +101,7 @@ class MessageServiceTest {
 
         when(configManager.areMessagesEnabled()).thenReturn(true);
         when(configManager.getMessagePrefix()).thenReturn("P ");
-        when(configManager.getMessages(MessageKey.USAGE)).thenReturn(List.of("usage"));
+        when(configManager.getMessages(MessageKey.USAGE)).thenReturn(List.of("{prefix}usage"));
 
         messageService.send(console, MessageKey.USAGE);
 
@@ -116,12 +117,14 @@ class MessageServiceTest {
 
         when(player.isOnline()).thenReturn(true);
         when(configManager.areMessagesEnabled()).thenReturn(true);
-        // Префикс приходит из ConfigManager уже окрашенным
+        // Префикс приходит из ConfigManager уже окрашенным и только через {prefix}
         when(configManager.getMessagePrefix()).thenReturn("§7> ");
 
-        messageService.sendRaw(player, "&cError");
+        messageService.sendRaw(player, "{prefix}&cError");
+        messageService.sendRaw(player, "&aClean");
 
         verify(player).sendMessage("§7> §cError");
+        verify(player).sendMessage("§aClean");
 
     }
 }

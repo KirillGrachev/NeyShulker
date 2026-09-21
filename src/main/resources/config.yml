@@ -3,18 +3,22 @@ settings:
 
   shulker:
     # How the shulker box GUI is opened with a right click:
-    # SHIFT      - only while sneaking (Shift + RMB). Recommended: sneaking never places
-    #              the box, so you can still place it normally without Shift.
+    # AIR        - right click in the air opens the GUI, any block click stays vanilla,
+    #              so placing the box always works without modifiers. Recommended.
+    # SHIFT      - only while sneaking (Shift + RMB, air or block).
     # NO_SHIFT   - only while NOT sneaking (plain RMB, the box is not placed).
     # ALWAYS     - on every right click, the box can never be placed by hand.
-    # SMART      - while sneaking: always. While not sneaking: only in the air and on
-    #              non-interactable blocks (chests, doors, furnaces stay vanilla).
-    open_method: SHIFT
+    # SMART      - while sneaking: anywhere. While not sneaking: only in the air.
+    open_method: AIR
 
-    title: " #f5e6ff{shulker_name} " # GUI title. HEX colors supported
-    # Placeholders: {shulker_name} - display name of the item or its material name
+    title:
+      # ORIGINAL - the shulker's own name: item display name, or the material
+      #            name when the item has none
+      # CUSTOM   - the format template below; HEX colors supported
+      mode: CUSTOM
+      format: " #f5e6ff{shulker_name} "
+      # Placeholders: {shulker_name} - display name of the item or its material name
 
-    prevent_nested: true # Prohibit putting a shulker box inside another shulker box
     save_interval: 10 # Ticks between automatic saves while the GUI is open (20 = 1s)
 
     blacklist: # Items that cannot be put into a shulker box (bypass: neyshulker.bypass.blacklist)
@@ -33,14 +37,34 @@ settings:
 
   auto_collect:
     enabled: true # Suck nearby items into a free shulker box in the inventory
-    permission_required: false # true - only players with neyshulker.autocollect collect items
-    check_interval: 20 # Ticks between scans (20 = 1s). Lower = faster, heavier
-    max_distance: 3.0 # Pickup radius in blocks
-    only_when_inventory_full: true # Collect only when the player inventory has no free slot
-    max_items_per_tick: 8 # Anti-lag: max items collected per scan per player
-    collect_shulker_boxes: false # NEVER enable this unless you know what you are doing
-    ignore_pickup_delay: false # true - also collect items that still have a pickup delay
-    messages: false # Report what was collected into the chat
+
+    scan:
+      interval: 20 # Ticks between scans (20 = 1s). Lower = faster, heavier
+      distance: 4.5 # Pickup radius in blocks; mining reach is ~4.5, so smaller
+        # radii leave half the drops behind when farming blocks ahead of you
+      limit: 8 # Anti-lag: max items collected per scan per player
+
+    rules:
+      only_full_inventory: false # true - collect only when the player
+        # inventory has no free slot (vacuum for full-inventory servers)
+      merge_into_existing: true # true - a box without free slots still absorbs
+        # drops of types it already holds, merging into partial stacks
+      ignore_pickup_delay: false # true - also collect items that still have a
+        # pickup delay (fresh drops wait ~0.5s before the auto-collect may touch them)
+
+    inventory:
+      mode: MATCHING # Items that vanilla pickup already delivered into the
+        # player inventory are sorted into the boxes as well:
+        # OFF      - do not touch the inventory, ground drops only
+        # MATCHING - only move types already present in a box (safe sorting)
+        # ALL      - move every eligible item with space available;
+        #            the inventory works as a transit buffer
+
+    permission:
+      required: false # true - only players with neyshulker.autocollect collect items
+
+    feedback:
+      messages: false # Report what was collected into the chat (useful while testing)
 
     priority_items: # Collected first (most valuable items get into the box first)
       - "NETHERITE_INGOT"
@@ -65,90 +89,99 @@ messages:
 
   no_permission:
     enabled: true
-    text: "&#ff6b6bYou do not have permission to do this."
+    text: "{prefix}&#ff6b6bYou do not have permission to do this."
 
   player_only:
     enabled: true
-    text: "&#ff6b6bThis command is available to players only."
+    text: "{prefix}&#ff6b6bThis command is available to players only."
 
   usage:
     enabled: true
-    text: "&#8ce0ffUsage: &f/shulker <reload|open|info|autocollect>"
+    text:
+      - "{prefix}&#8ce0ffNeyShulker commands:"
+      - "&f/shulker reload &8- &7reload the configuration"
+      - "&f/shulker open &8- &7open the shulker box in your hand"
+      - "&f/shulker info &8- &7current session and auto-collect state"
+      - "&f/shulker autocollect &8- &7toggle auto-collect for yourself"
 
   open_error:
     enabled: true
-    text: "&#ff6b6bFailed to open this shulker box."
+    text: "{prefix}&#ff6b6bFailed to open this shulker box."
+
+  no_shulker_in_hand:
+    enabled: true
+    text: "{prefix}&#ff6b6bHold a shulker box in your hand first."
 
   blacklisted:
     enabled: true
-    text: "&#ff6b6bThis item cannot be placed into a shulker box."
+    text: "{prefix}&#ff6b6bThis item cannot be placed into a shulker box."
 
   nested_shulker:
     enabled: true
-    text: "&#ff6b6bA shulker box cannot be placed into another shulker box."
+    text: "{prefix}&#ff6b6bA shulker box cannot be placed into another shulker box."
 
   self_remove:
     enabled: true
-    text: "&#ff6b6bYou cannot take the opened shulker box away."
+    text: "{prefix}&#ff6b6bYou cannot take the opened shulker box away."
 
   move_blocked:
     enabled: true
-    text: "&#ff6b6bThe opened shulker box cannot be moved."
+    text: "{prefix}&#ff6b6bThe opened shulker box cannot be moved."
 
   drop_blocked:
     enabled: true
-    text: "&#ff6b6bThe opened shulker box cannot be dropped."
+    text: "{prefix}&#ff6b6bThe opened shulker box cannot be dropped."
 
   swap_blocked:
     enabled: true
-    text: "&#ff6b6bThe opened shulker box cannot be swapped."
+    text: "{prefix}&#ff6b6bThe opened shulker box cannot be swapped."
 
   no_space:
     enabled: true
-    text: "&#ffe066The shulker box is full."
+    text: "{prefix}&#ffe066The shulker box is full."
 
   saved:
     enabled: false
-    text: "&#9dff8cThe contents of the shulker box have been saved."
+    text: "{prefix}&#9dff8cThe contents of the shulker box have been saved."
 
   auto_collect:
     enabled: true
-    text: "&#8ce0ffCollected items: &f{amount}"
+    text: "{prefix}&#8ce0ffCollected items: &f{amount}"
 
   auto_collect_full:
     enabled: true
-    text: "&#ffe066The shulker box is full, cannot collect items."
+    text: "{prefix}&#ffe066The shulker box is full, cannot collect items."
 
   auto_collect_no_shulker:
     enabled: false
-    text: "&#ffe066No free shulker box found in your inventory."
+    text: "{prefix}&#ffe066No free shulker box found in your inventory."
 
   auto_collect_on:
     enabled: true
-    text: "&#9dff8cAuto-collect enabled."
+    text: "{prefix}&#9dff8cAuto-collect enabled."
 
   auto_collect_off:
     enabled: true
-    text: "&#ffe066Auto-collect disabled."
+    text: "{prefix}&#ffe066Auto-collect disabled."
 
   reload:
     enabled: true
-    text: "&#9dff8cConfiguration reloaded."
+    text: "{prefix}&#9dff8cConfiguration reloaded."
 
-sounds:
-  enabled: true
-  open:
-    sound: BLOCK_SHULKER_BOX_OPEN
-    volume: 1.0
-    pitch: 1.0
-  close:
-    sound: BLOCK_SHULKER_BOX_CLOSE
-    volume: 1.0
-    pitch: 1.0
-  collect:
-    sound: ENTITY_ITEM_PICKUP
-    volume: 0.5
-    pitch: 1.2
+  console: # Console notices in the same format as chat messages:
+    # enabled flag plus text as a list of lines, HEX colors and {placeholders}
+    unknown_sound:
+      enabled: true
+      text:
+        - "&eUnknown sound at {path}: '{value}'. Using {defaultValue}."
+    unknown_material:
+      enabled: true
+      text:
+        - "&eUnknown material at {path}: '{value}'. Skipped."
+    invalid_value:
+      enabled: true
+      text:
+        - "&eInvalid value at {path}: '{value}'. Using {defaultValue}."
 
 permissions:
   enabled: false # Enable the permission system (all checks below become active)

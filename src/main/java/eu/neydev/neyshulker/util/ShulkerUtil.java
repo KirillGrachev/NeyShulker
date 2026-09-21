@@ -18,6 +18,17 @@ public final class ShulkerUtil {
 
     public static final int SHULKER_SIZE = 27;
 
+    /**
+     * Размер области хранения инвентаря игрока (хотбар + основной).
+     */
+    public static final int PLAYER_STORAGE_SLOTS = 36;
+
+    /**
+     * Индекс второй руки в инвентаре игрока:
+     * 0-35 хранение, 36-39 броня, 40 - вторая рука.
+     */
+    public static final int OFF_HAND_SLOT = 40;
+
     private static final Set<Material> SHULKER_BOXES = EnumSet.noneOf(Material.class);
 
     static {
@@ -166,8 +177,16 @@ public final class ShulkerUtil {
      * @return число свободных слотов (0 если предмет не шалкер-бокс)
      */
     public static int countFreeSlots(@Nullable ItemStack shulker) {
+        return countFreeSlots(readContents(shulker));
+    }
 
-        ItemStack[] contents = readContents(shulker);
+    /**
+     * Считает свободные слоты по готовому содержимому.
+     *
+     * @param contents содержимое бокса (может быть null)
+     * @return число свободных слотов
+     */
+    public static int countFreeSlots(ItemStack @Nullable [] contents) {
 
         if (contents == null) {
             return 0;

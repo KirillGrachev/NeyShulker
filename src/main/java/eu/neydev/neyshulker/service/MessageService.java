@@ -97,12 +97,17 @@ public class MessageService {
             return;
         }
 
-        player.sendMessage(configManager.getMessagePrefix() + HexColorUtil.color(text));
+        player.sendMessage(applyPlaceholders(HexColorUtil.color(text),
+                Map.of("prefix", configManager.getMessagePrefix())));
 
     }
 
     /**
-     * Собирает готовые строки сообщения: префикс + текст + плейсхолдеры.
+     * Собирает готовые строки сообщения с плейсхолдерами.
+     *
+     * Префикс плагина НЕ пришивается автоматически: он появляется только там,
+     * где автор сообщения явно написал {prefix}. Так многострочные сообщения
+     * не превращаются в простыню из повторяющихся префиксов.
      *
      * @param key          ключ сообщения
      * @param placeholders карта плейсхолдеров
@@ -117,11 +122,11 @@ public class MessageService {
             return List.of();
         }
 
-        String prefix = configManager.getMessagePrefix();
+        Map<String, String> all = new java.util.HashMap<>(placeholders);
+        all.putIfAbsent("prefix", configManager.getMessagePrefix());
 
         return lines.stream()
-                .map(line -> applyPlaceholders(line, placeholders))
-                .map(line -> line.isEmpty() ? line : prefix + line)
+                .map(line -> applyPlaceholders(line, all))
                 .toList();
 
     }

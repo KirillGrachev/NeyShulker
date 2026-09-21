@@ -1,16 +1,21 @@
 package eu.neydev.neyshulker.config;
 
 import eu.neydev.neyshulker.NeyShulker;
+import eu.neydev.neyshulker.config.type.ConsoleMessage;
 import eu.neydev.neyshulker.config.type.MessageKey;
 import eu.neydev.neyshulker.config.type.OpenMethodType;
 import eu.neydev.neyshulker.config.type.PermissionNode;
 import eu.neydev.neyshulker.config.type.SoundKey;
+import eu.neydev.neyshulker.config.type.SoundSettings;
+import eu.neydev.neyshulker.config.type.InventoryCollectMode;
+import eu.neydev.neyshulker.config.type.TitleMode;
+import eu.neydev.neyshulker.service.ConsoleService;
 import eu.neydev.neyshulker.util.HexColorUtil;
 import org.bukkit.Material;
-import org.bukkit.Sound;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.configuration.file.YamlConfiguration;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 import java.io.File;
 import java.util.ArrayList;
@@ -18,19 +23,22 @@ import java.util.Collections;
 import java.util.EnumMap;
 import java.util.EnumSet;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CopyOnWriteArrayList;
 
 /**
  * Менеджер конфигурации NeyShulker.
- * Значения читаются один раз при загрузке и кэшируются,
- * поэтому обращения из слушателей не трогают диск и YAML.
+ *
+ * Все значения читаются один раз при загрузке и кэшируются, обращения
+ * из слушателей не трогают диск и YAML. Некорректные значения не роняют
+ * загрузку: подставляется дефолт, а в консоль уходит шаблонное
+ * предупреждение через ConsoleService.
  */
 public class ConfigManager implements NeyShulkerConfig {
 
     private final NeyShulker plugin;
+    private final ConsoleService consoleService;
     private final List<Runnable> reloadListeners = new CopyOnWriteArrayList<>();
 
     private FileConfiguration config;
@@ -43,7 +51,8 @@ public class ConfigManager implements NeyShulkerConfig {
 
     private static final String PATH_OPEN_METHOD = "settings.shulker.open_method";
     private static final String PATH_TITLE = "settings.shulker.title";
-    private static final String PATH_PREVENT_NESTED = "settings.shulker.prevent_nested";
+    private static final String PATH_TITLE_MODE = "settings.shulker.title.mode";
+    private static final String PATH_TITLE_FORMAT = "settings.shulker.title.format";
     private static final String PATH_SAVE_INTERVAL = "settings.shulker.save_interval";
     private static final String PATH_BLACKLIST_ENABLED = "settings.shulker.blacklist.enabled";
     private static final String PATH_BLACKLIST_ITEMS = "settings.shulker.blacklist.items";
@@ -51,14 +60,15 @@ public class ConfigManager implements NeyShulkerConfig {
     // --- Автосбор ---
 
     private static final String PATH_AUTO_COLLECT_ENABLED = "settings.auto_collect.enabled";
-    private static final String PATH_AUTO_COLLECT_PERMISSION = "settings.auto_collect.permission_required";
-    private static final String PATH_AUTO_COLLECT_INTERVAL = "settings.auto_collect.check_interval";
-    private static final String PATH_AUTO_COLLECT_DISTANCE = "settings.auto_collect.max_distance";
-    private static final String PATH_AUTO_COLLECT_ONLY_FULL = "settings.auto_collect.only_when_inventory_full";
-    private static final String PATH_AUTO_COLLECT_MAX_ITEMS = "settings.auto_collect.max_items_per_tick";
-    private static final String PATH_AUTO_COLLECT_SHULKERS = "settings.auto_collect.collect_shulker_boxes";
-    private static final String PATH_AUTO_COLLECT_IGNORE_DELAY = "settings.auto_collect.ignore_pickup_delay";
-    private static final String PATH_AUTO_COLLECT_MESSAGES = "settings.auto_collect.messages";
+    private static final String PATH_AUTO_COLLECT_INTERVAL = "settings.auto_collect.scan.interval";
+    private static final String PATH_AUTO_COLLECT_DISTANCE = "settings.auto_collect.scan.distance";
+    private static final String PATH_AUTO_COLLECT_MAX_ITEMS = "settings.auto_collect.scan.limit";
+    private static final String PATH_AUTO_COLLECT_ONLY_FULL = "settings.auto_collect.rules.only_full_inventory";
+    private static final String PATH_AUTO_COLLECT_MERGE = "settings.auto_collect.rules.merge_into_existing";
+    private static final String PATH_AUTO_COLLECT_INV_MODE = "settings.auto_collect.inventory.mode";
+    private static final String PATH_AUTO_COLLECT_IGNORE_DELAY = "settings.auto_collect.rules.ignore_pickup_delay";
+    private static final String PATH_AUTO_COLLECT_PERMISSION = "settings.auto_collect.permission.required";
+    private static final String PATH_AUTO_COLLECT_MESSAGES = "settings.auto_collect.feedback.messages";
     private static final String PATH_AUTO_COLLECT_PRIORITY = "settings.auto_collect.priority_items";
     private static final String PATH_AUTO_COLLECT_BLACKLIST = "settings.auto_collect.blacklist";
 
@@ -66,8 +76,12 @@ public class ConfigManager implements NeyShulkerConfig {
 
     private static final String PATH_MESSAGES_ENABLED = "messages.enabled";
     private static final String PATH_MESSAGE_PREFIX = "messages.prefix";
-    private static final String PATH_SOUNDS_ENABLED = "sounds.enabled";
     private static final String PATH_PERMISSIONS_ENABLED = "permissions.enabled";
+
+    // --- Ограничения значений ---
+
+    private static final int MIN_INTERVAL_TICKS = 1;
+    private static final double MIN_DISTANCE = 0.0D;
 
     // --- Значения по умолчанию ---
 
@@ -93,8 +107,8 @@ public class ConfigManager implements NeyShulkerConfig {
     private boolean pluginEnabled;
 
     private OpenMethodType openMethod;
-    private String shulkerTitle;
-    private boolean nestedPrevented;
+    private TitleMode titleMode;
+    private String titleFormat;
     private int saveInterval;
     private boolean blacklistEnabled;
     private Set<Material> blacklistedMaterials;
@@ -104,8 +118,9 @@ public class ConfigManager implements NeyShulkerConfig {
     private int autoCollectInterval;
     private double autoCollectMaxDistance;
     private boolean autoCollectOnlyWhenInventoryFull;
+    private boolean autoCollectMergeIntoExisting;
+    private InventoryCollectMode autoCollectInventoryMode;
     private int autoCollectMaxItemsPerTick;
-    private boolean autoCollectShulkerBoxes;
     private boolean autoCollectIgnorePickupDelay;
     private boolean autoCollectMessages;
     private List<Material> autoCollectPriorityItems;
@@ -115,17 +130,15 @@ public class ConfigManager implements NeyShulkerConfig {
     private String messagePrefix;
     private final Map<MessageKey, List<String>> messages = new EnumMap<>(MessageKey.class);
 
-    private boolean soundsEnabled;
-    private final Map<SoundKey, Sound> sounds = new EnumMap<>(SoundKey.class);
-    private final Map<SoundKey, Float> soundVolumes = new EnumMap<>(SoundKey.class);
-    private final Map<SoundKey, Float> soundPitches = new EnumMap<>(SoundKey.class);
+    private final Map<SoundKey, SoundSettings> sounds = new EnumMap<>(SoundKey.class);
 
     private boolean permissionsEnabled;
     private final Map<PermissionNode, String> permissions = new EnumMap<>(PermissionNode.class);
 
-    public ConfigManager(NeyShulker plugin) {
+    public ConfigManager(NeyShulker plugin, ConsoleService consoleService) {
 
         this.plugin = plugin;
+        this.consoleService = consoleService;
 
         saveDefaultConfig();
 
@@ -138,6 +151,8 @@ public class ConfigManager implements NeyShulkerConfig {
      * Перезагружает конфигурацию и уведомляет подписанные компоненты.
      */
     public void reload() {
+
+        plugin.reloadConfig();
 
         loadConfig();
         cacheConfigValues();
@@ -166,13 +181,13 @@ public class ConfigManager implements NeyShulkerConfig {
     }
 
     @Override
-    public String getShulkerTitle() {
-        return shulkerTitle;
+    public TitleMode getTitleMode() {
+        return titleMode;
     }
 
     @Override
-    public boolean isNestedPrevented() {
-        return nestedPrevented;
+    public String getTitleFormat() {
+        return titleFormat;
     }
 
     @Override
@@ -221,13 +236,18 @@ public class ConfigManager implements NeyShulkerConfig {
     }
 
     @Override
-    public int getAutoCollectMaxItemsPerTick() {
-        return autoCollectMaxItemsPerTick;
+    public boolean isAutoCollectMergeIntoExisting() {
+        return autoCollectMergeIntoExisting;
     }
 
     @Override
-    public boolean isAutoCollectShulkerBoxesEnabled() {
-        return autoCollectShulkerBoxes;
+    public InventoryCollectMode getAutoCollectInventoryMode() {
+        return autoCollectInventoryMode;
+    }
+
+    @Override
+    public int getAutoCollectMaxItemsPerTick() {
+        return autoCollectMaxItemsPerTick;
     }
 
     @Override
@@ -267,27 +287,31 @@ public class ConfigManager implements NeyShulkerConfig {
 
     @Override
     public List<String> getMessages(MessageKey key) {
-        return messages.getOrDefault(key, List.of(HexColorUtil.color(key.getDefaultMessage())));
+
+        List<String> cached = messages.get(key);
+
+        if (cached != null) {
+            return cached;
+        }
+
+        // Дефолт ключа может содержать переносы: каждое полотно режется на строки
+        return List.of(HexColorUtil.color(key.getDefaultMessage()).split("\n"));
+
     }
 
     @Override
-    public boolean areSoundsEnabled() {
-        return soundsEnabled;
+    public SoundSettings getOpenSound() {
+        return sounds.get(SoundKey.OPEN);
     }
 
     @Override
-    public Sound getSound(SoundKey key) {
-        return sounds.getOrDefault(key, key.getDefaultSound());
+    public SoundSettings getCloseSound() {
+        return sounds.get(SoundKey.CLOSE);
     }
 
     @Override
-    public float getSoundVolume(SoundKey key) {
-        return soundVolumes.getOrDefault(key, key.getDefaultVolume());
-    }
-
-    @Override
-    public float getSoundPitch(SoundKey key) {
-        return soundPitches.getOrDefault(key, key.getDefaultPitch());
+    public SoundSettings getCollectSound() {
+        return sounds.get(SoundKey.COLLECT);
     }
 
     @Override
@@ -324,10 +348,11 @@ public class ConfigManager implements NeyShulkerConfig {
     private void cacheShulkerValues() {
 
         pluginEnabled = config.getBoolean(PATH_ENABLED, true);
-        openMethod = OpenMethodType.fromString(config.getString(PATH_OPEN_METHOD), OpenMethodType.SHIFT);
-        shulkerTitle = HexColorUtil.color(config.getString(PATH_TITLE, "{shulker_name}"));
-        nestedPrevented = config.getBoolean(PATH_PREVENT_NESTED, true);
-        saveInterval = Math.max(1, config.getInt(PATH_SAVE_INTERVAL, 10));
+        openMethod = parseOpenMethod();
+        titleMode = parseTitleMode();
+        titleFormat = color(readTitleFormat());
+        saveInterval = intOrWarn(config.getInt(PATH_SAVE_INTERVAL, 10),
+                PATH_SAVE_INTERVAL, MIN_INTERVAL_TICKS);
         blacklistEnabled = config.getBoolean(PATH_BLACKLIST_ENABLED, true);
         blacklistedMaterials = readMaterials(PATH_BLACKLIST_ITEMS, DEFAULT_BLACKLIST);
 
@@ -337,11 +362,15 @@ public class ConfigManager implements NeyShulkerConfig {
 
         autoCollectEnabled = config.getBoolean(PATH_AUTO_COLLECT_ENABLED, true);
         autoCollectPermissionRequired = config.getBoolean(PATH_AUTO_COLLECT_PERMISSION, false);
-        autoCollectInterval = Math.max(1, config.getInt(PATH_AUTO_COLLECT_INTERVAL, 20));
-        autoCollectMaxDistance = Math.max(0.0D, config.getDouble(PATH_AUTO_COLLECT_DISTANCE, 3.0D));
-        autoCollectOnlyWhenInventoryFull = config.getBoolean(PATH_AUTO_COLLECT_ONLY_FULL, true);
-        autoCollectMaxItemsPerTick = Math.max(1, config.getInt(PATH_AUTO_COLLECT_MAX_ITEMS, 8));
-        autoCollectShulkerBoxes = config.getBoolean(PATH_AUTO_COLLECT_SHULKERS, false);
+        autoCollectInterval = intOrWarn(config.getInt(PATH_AUTO_COLLECT_INTERVAL, 20),
+                PATH_AUTO_COLLECT_INTERVAL, MIN_INTERVAL_TICKS);
+        autoCollectMaxDistance = doubleOrWarn(config.getDouble(PATH_AUTO_COLLECT_DISTANCE, 4.5D),
+                PATH_AUTO_COLLECT_DISTANCE, MIN_DISTANCE);
+        autoCollectOnlyWhenInventoryFull = config.getBoolean(PATH_AUTO_COLLECT_ONLY_FULL, false);
+        autoCollectMergeIntoExisting = config.getBoolean(PATH_AUTO_COLLECT_MERGE, true);
+        autoCollectInventoryMode = parseInventoryCollectMode();
+        autoCollectMaxItemsPerTick = intOrWarn(config.getInt(PATH_AUTO_COLLECT_MAX_ITEMS, 8),
+                PATH_AUTO_COLLECT_MAX_ITEMS, MIN_INTERVAL_TICKS);
         autoCollectIgnorePickupDelay = config.getBoolean(PATH_AUTO_COLLECT_IGNORE_DELAY, false);
         autoCollectMessages = config.getBoolean(PATH_AUTO_COLLECT_MESSAGES, false);
         autoCollectBlacklist = readMaterials(PATH_AUTO_COLLECT_BLACKLIST, DEFAULT_AUTO_COLLECT_BLACKLIST);
@@ -352,7 +381,7 @@ public class ConfigManager implements NeyShulkerConfig {
     private void cacheMessages() {
 
         messagesEnabled = config.getBoolean(PATH_MESSAGES_ENABLED, true);
-        messagePrefix = HexColorUtil.color(config.getString(PATH_MESSAGE_PREFIX, ""));
+        messagePrefix = color(config.getString(PATH_MESSAGE_PREFIX, ""));
         messages.clear();
 
         for (MessageKey key : MessageKey.values()) {
@@ -372,24 +401,10 @@ public class ConfigManager implements NeyShulkerConfig {
 
     private void cacheSounds() {
 
-        soundsEnabled = config.getBoolean(PATH_SOUNDS_ENABLED, true);
-
         sounds.clear();
-        soundVolumes.clear();
-        soundPitches.clear();
-
-        if (!soundsEnabled) {
-            return;
-        }
 
         for (SoundKey key : SoundKey.values()) {
-
-            String path = "sounds." + key.getConfigKey();
-
-            sounds.put(key, readSound(path + ".sound", key.getDefaultSound()));
-            soundVolumes.put(key, (float) config.getDouble(path + ".volume", key.getDefaultVolume()));
-            soundPitches.put(key, (float) config.getDouble(path + ".pitch", key.getDefaultPitch()));
-
+            sounds.put(key, loadSound(key));
         }
 
     }
@@ -406,14 +421,166 @@ public class ConfigManager implements NeyShulkerConfig {
 
     }
 
-    // --- Чтение значений ---
+    // --- Чтение значений с валидацией ---
+
+    /**
+     * Читает режим досортировки инвентаря; при некорректном значении - MATCHING.
+     *
+     * @return режим источника "инвентарь"
+     */
+    private @NotNull InventoryCollectMode parseInventoryCollectMode() {
+
+        String configValue = config.getString(PATH_AUTO_COLLECT_INV_MODE,
+                InventoryCollectMode.MATCHING.name());
+
+        InventoryCollectMode parsed = InventoryCollectMode.fromString(configValue, null);
+
+        if (parsed != null) {
+            return parsed;
+        }
+
+        consoleService.log(ConsoleMessage.INVALID_VALUE,
+                "path", PATH_AUTO_COLLECT_INV_MODE,
+                "value", String.valueOf(configValue),
+                "defaultValue", InventoryCollectMode.MATCHING.name());
+
+        return InventoryCollectMode.MATCHING;
+
+    }
+
+    /**
+     * Читает режим заголовка.
+     *
+     * Поддерживаются обе формы конфигурации: секция title с mode/format
+     * и legacy-строка title: "..." (равносильна CUSTOM с этим шаблоном).
+     *
+     * @return режим заголовка GUI
+     */
+    private @NotNull TitleMode parseTitleMode() {
+
+        String configValue = config.get(PATH_TITLE) instanceof org.bukkit.configuration.ConfigurationSection section
+                ? section.getString("mode", TitleMode.CUSTOM.name())
+                : TitleMode.CUSTOM.name();
+
+        TitleMode parsed = TitleMode.fromString(configValue, null);
+
+        if (parsed != null) {
+            return parsed;
+        }
+
+        consoleService.log(ConsoleMessage.INVALID_VALUE,
+                "path", PATH_TITLE_MODE,
+                "value", String.valueOf(configValue),
+                "defaultValue", TitleMode.CUSTOM.name());
+
+        return TitleMode.CUSTOM;
+
+    }
+
+    /**
+     * Читает шаблон заголовка из секции или legacy-строки.
+     *
+     * @return сырой шаблон с плейсхолдером {shulker_name}
+     */
+    private @NotNull String readTitleFormat() {
+
+        Object raw = config.get(PATH_TITLE);
+
+        if (raw instanceof org.bukkit.configuration.ConfigurationSection section) {
+            return section.getString("format", "{shulker_name}");
+        }
+
+        if (raw instanceof String legacy) {
+            return legacy;
+        }
+
+        return "{shulker_name}";
+
+    }
+
+    /**
+     * Читает способ открытия; при некорректном значении возвращается AIR.
+     *
+     * @return способ открытия шалкер-бокса
+     */
+    private @NotNull OpenMethodType parseOpenMethod() {
+
+        String configValue = config.getString(PATH_OPEN_METHOD, OpenMethodType.AIR.name());
+        OpenMethodType parsed = OpenMethodType.fromString(configValue, null);
+
+        if (parsed != null) {
+            return parsed;
+        }
+
+        consoleService.log(ConsoleMessage.INVALID_VALUE,
+                "path", PATH_OPEN_METHOD,
+                "value", String.valueOf(configValue),
+                "defaultValue", OpenMethodType.AIR.name());
+
+        return OpenMethodType.AIR;
+
+    }
+
+    /**
+     * Читает звук ключа; неизвестное имя подменяется дефолтом с предупреждением.
+     *
+     * @param key ключ звука
+     * @return готовые настройки звука
+     */
+    private @NotNull SoundSettings loadSound(@NotNull SoundKey key) {
+
+        String path = "sounds." + key.getConfigKey();
+
+        return SoundSettings.of(
+                config.getString(path + ".sound"),
+                key.getDefaultSound(),
+                config.getBoolean(path + ".enabled", true),
+                (float) config.getDouble(path + ".volume", key.getDefaultVolume()),
+                (float) config.getDouble(path + ".pitch", key.getDefaultPitch()),
+                () -> consoleService.log(ConsoleMessage.UNKNOWN_SOUND,
+                        "path", path + ".sound",
+                        "value", String.valueOf(config.getString(path + ".sound")),
+                        "defaultValue", key.getDefaultSound().name())
+        );
+
+    }
+
+    private int intOrWarn(int value, @NotNull String path, int minimum) {
+
+        if (value >= minimum) {
+            return value;
+        }
+
+        consoleService.log(ConsoleMessage.INVALID_VALUE,
+                "path", path,
+                "value", String.valueOf(value),
+                "defaultValue", String.valueOf(minimum));
+
+        return minimum;
+
+    }
+
+    private double doubleOrWarn(double value, @NotNull String path, double minimum) {
+
+        if (value >= minimum) {
+            return value;
+        }
+
+        consoleService.log(ConsoleMessage.INVALID_VALUE,
+                "path", path,
+                "value", String.valueOf(value),
+                "defaultValue", String.valueOf(minimum));
+
+        return minimum;
+
+    }
 
     private @NotNull List<String> readColoredLines(String path, String defaultValue) {
 
         Object raw = config.get(path);
 
         if (raw == null) {
-            return List.of(HexColorUtil.color(defaultValue));
+            return List.of(color(defaultValue));
         }
 
         if (raw instanceof List<?> list) {
@@ -423,7 +590,7 @@ public class ConfigManager implements NeyShulkerConfig {
             for (Object element : list) {
 
                 if (element != null) {
-                    lines.add(HexColorUtil.color(String.valueOf(element)));
+                    lines.add(color(String.valueOf(element)));
                 }
 
             }
@@ -432,7 +599,7 @@ public class ConfigManager implements NeyShulkerConfig {
 
         }
 
-        return List.of(HexColorUtil.color(String.valueOf(raw)));
+        return List.of(color(String.valueOf(raw)));
 
     }
 
@@ -448,12 +615,10 @@ public class ConfigManager implements NeyShulkerConfig {
 
         for (String name : names) {
 
-            Material material = readMaterial(name);
+            Material material = readMaterial(name, path);
 
             if (material != null) {
                 materials.add(material);
-            } else {
-                warnUnknownMaterial(path, name);
             }
 
         }
@@ -474,12 +639,10 @@ public class ConfigManager implements NeyShulkerConfig {
 
         for (String name : names) {
 
-            Material material = readMaterial(name);
+            Material material = readMaterial(name, path);
 
             if (material != null && !materials.contains(material)) {
                 materials.add(material);
-            } else if (material == null) {
-                warnUnknownMaterial(path, name);
             }
 
         }
@@ -488,37 +651,27 @@ public class ConfigManager implements NeyShulkerConfig {
 
     }
 
-    private Material readMaterial(String name) {
+    private @Nullable Material readMaterial(@Nullable String name, @NotNull String path) {
 
         if (name == null || name.isBlank()) {
             return null;
         }
 
-        // isItem() не проверяем: реестр материалов поднимается только на сервере,
-        // а "лишний" блок-материал в списке безвреден - предметы им не совпадут
-        return Material.matchMaterial(name.trim());
+        Material material = Material.matchMaterial(name.trim());
+
+        if (material == null) {
+
+            consoleService.log(ConsoleMessage.UNKNOWN_MATERIAL,
+                    "path", path,
+                    "value", name);
+
+        }
+
+        return material;
 
     }
 
-    private @NotNull Sound readSound(String path, Sound defaultSound) {
-
-        String name = config.getString(path, defaultSound.name());
-
-        if (name == null || name.isBlank()) {
-            return defaultSound;
-        }
-
-        try {
-            return Sound.valueOf(name.trim().toUpperCase(Locale.ROOT));
-        } catch (IllegalArgumentException exception) {
-            plugin.getLogger().warning("Неизвестный звук в " + path + ": '" + name
-                    + "'. Использован " + defaultSound.name() + ".");
-            return defaultSound;
-        }
-
-    }
-
-    private void warnUnknownMaterial(String path, String name) {
-        plugin.getLogger().warning("Неизвестный предмет в " + path + ": '" + name + "'. Значение пропущено.");
+    private @NotNull String color(@Nullable String text) {
+        return HexColorUtil.color(text);
     }
 }

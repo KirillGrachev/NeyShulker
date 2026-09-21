@@ -1,6 +1,5 @@
 package eu.neydev.neyshulker.service;
 
-import eu.neydev.neyshulker.model.TransferResult;
 import eu.neydev.neyshulker.util.ItemStackTransaction;
 import eu.neydev.neyshulker.util.ShulkerUtil;
 import org.bukkit.entity.Player;
@@ -15,87 +14,6 @@ import org.jetbrains.annotations.Nullable;
  * исходные стеки не мутируются, поэтому отмена или прерывание не приводят к дюпу.
  */
 public class InventoryTransferService {
-
-    /**
-     * Перемещает предмет между двумя слотами разных инвентарей.
-     *
-     * @param player          игрок, которому нужно обновить клиент
-     * @param source          исходный инвентарь
-     * @param sourceSlot      слот источника
-     * @param destination     целевой инвентарь
-     * @param destinationSlot слот назначения
-     * @param maxAmount       максимальное число предметов для переноса
-     * @return количество перемещенных предметов
-     */
-    public int moveSlot(@Nullable Player player,
-                        @NotNull Inventory source, int sourceSlot,
-                        @NotNull Inventory destination, int destinationSlot,
-                        int maxAmount) {
-
-        if (source.equals(destination) && sourceSlot == destinationSlot) {
-            return 0;
-        }
-
-        if (!isValidSlot(source, sourceSlot) || !isValidSlot(destination, destinationSlot)) {
-            return 0;
-        }
-
-        ItemStack sourceItem = source.getItem(sourceSlot);
-
-        if (ShulkerUtil.isEmpty(sourceItem)) {
-            return 0;
-        }
-
-        ItemStack destinationItem = destination.getItem(destinationSlot);
-        TransferResult result = ItemStackTransaction.move(sourceItem, destinationItem, maxAmount);
-
-        if (!result.isSuccess()) {
-            return 0;
-        }
-
-        // Фиксация: оба слота записываются одним неделимым шагом
-        source.setItem(sourceSlot, result.source());
-        destination.setItem(destinationSlot, result.destination());
-
-        resync(player);
-
-        return result.transferred();
-
-    }
-
-    /**
-     * Перемещает предмет из слота в первый подходящий слот инвентаря.
-     *
-     * @param player      игрок, которому нужно обновить клиент
-     * @param source      исходный инвентарь
-     * @param sourceSlot  слот источника
-     * @param destination целевой инвентарь
-     * @param maxAmount   максимальное число предметов для переноса
-     * @return количество перемещенных предметов
-     */
-    public int moveFirst(@Nullable Player player,
-                         @NotNull Inventory source, int sourceSlot,
-                         @NotNull Inventory destination, int maxAmount) {
-
-        if (!isValidSlot(source, sourceSlot)) {
-            return 0;
-        }
-
-        ItemStack sourceItem = source.getItem(sourceSlot);
-
-        if (ShulkerUtil.isEmpty(sourceItem)) {
-            return 0;
-        }
-
-        int destinationSlot = findSlot(destination, sourceItem, maxAmount);
-
-        if (destinationSlot < 0) {
-            return 0;
-        }
-
-        return moveSlot(player, source, sourceSlot, destination, destinationSlot, maxAmount);
-
-    }
 
     /**
      * Вставляет предмет в инвентарь.
@@ -141,49 +59,6 @@ public class InventoryTransferService {
 
         return item.getAmount() - (rest == null ? 0 : rest.getAmount());
 
-    }
-
-    /**
-     * Ищет слот, способный принять предмет: сначала похожий неполный стек, затем пустой.
-     *
-     * @param destination целевой инвентарь
-     * @param item        предмет для размещения
-     * @param maxAmount   требуемое место
-     * @return индекс слота или -1
-     */
-    public int findSlot(@NotNull Inventory destination,
-                        @NotNull ItemStack item,
-                        int maxAmount) {
-
-        int firstEmpty = -1;
-        int required = Math.min(maxAmount, item.getAmount());
-
-        for (int i = 0; i < destination.getSize(); i++) {
-
-            ItemStack slot = destination.getItem(i);
-
-            if (ShulkerUtil.isEmpty(slot)) {
-
-                if (firstEmpty < 0) {
-                    firstEmpty = i;
-                }
-
-                continue;
-
-            }
-
-            if (slot.isSimilar(item) && slot.getMaxStackSize() - slot.getAmount() >= required) {
-                return i;
-            }
-
-        }
-
-        return firstEmpty;
-
-    }
-
-    private boolean isValidSlot(@NotNull Inventory inventory, int slot) {
-        return slot >= 0 && slot < inventory.getSize();
     }
 
     private ItemStack @NotNull [] snapshotOf(int size, @NotNull java.util.function.IntFunction<ItemStack> getter) {

@@ -3,9 +3,10 @@ package eu.neydev.neyshulker.config;
 import eu.neydev.neyshulker.config.type.MessageKey;
 import eu.neydev.neyshulker.config.type.OpenMethodType;
 import eu.neydev.neyshulker.config.type.PermissionNode;
-import eu.neydev.neyshulker.config.type.SoundKey;
+import eu.neydev.neyshulker.config.type.SoundSettings;
+import eu.neydev.neyshulker.config.type.InventoryCollectMode;
+import eu.neydev.neyshulker.config.type.TitleMode;
 import org.bukkit.Material;
-import org.bukkit.Sound;
 
 import java.util.List;
 import java.util.Set;
@@ -24,9 +25,9 @@ public interface NeyShulkerConfig {
 
     OpenMethodType getOpenMethod();
 
-    String getShulkerTitle();
+    TitleMode getTitleMode();
 
-    boolean isNestedPrevented();
+    String getTitleFormat();
 
     int getSaveInterval();
 
@@ -48,9 +49,11 @@ public interface NeyShulkerConfig {
 
     boolean isAutoCollectOnlyWhenInventoryFull();
 
-    int getAutoCollectMaxItemsPerTick();
+    boolean isAutoCollectMergeIntoExisting();
 
-    boolean isAutoCollectShulkerBoxesEnabled();
+    InventoryCollectMode getAutoCollectInventoryMode();
+
+    int getAutoCollectMaxItemsPerTick();
 
     boolean isAutoCollectIgnorePickupDelay();
 
@@ -72,13 +75,11 @@ public interface NeyShulkerConfig {
 
     // --- Звуки ---
 
-    boolean areSoundsEnabled();
+    SoundSettings getOpenSound();
 
-    Sound getSound(SoundKey key);
+    SoundSettings getCloseSound();
 
-    float getSoundVolume(SoundKey key);
-
-    float getSoundPitch(SoundKey key);
+    SoundSettings getCollectSound();
 
     // --- Права ---
 

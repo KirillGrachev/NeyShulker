@@ -2,7 +2,7 @@ package eu.neydev.neyshulker.service;
 
 import eu.neydev.neyshulker.config.ConfigManager;
 import eu.neydev.neyshulker.config.type.PermissionNode;
-import eu.neydev.neyshulker.config.type.SoundKey;
+import eu.neydev.neyshulker.config.type.SoundSettings;
 import org.bukkit.Location;
 import org.bukkit.Sound;
 import org.bukkit.command.CommandSender;
@@ -32,10 +32,8 @@ class SoundAndPermissionServiceTest {
 
         when(player.isOnline()).thenReturn(true);
         when(player.getLocation()).thenReturn(location);
-        when(configManager.areSoundsEnabled()).thenReturn(true);
-        when(configManager.getSound(SoundKey.COLLECT)).thenReturn(Sound.ENTITY_ITEM_PICKUP);
-        when(configManager.getSoundVolume(SoundKey.COLLECT)).thenReturn(0.5f);
-        when(configManager.getSoundPitch(SoundKey.COLLECT)).thenReturn(1.2f);
+        when(configManager.getCollectSound()).thenReturn(
+                new SoundSettings(Sound.ENTITY_ITEM_PICKUP, true, 0.5f, 1.2f));
 
         new SoundService(configManager).playCollect(player);
 
@@ -50,7 +48,8 @@ class SoundAndPermissionServiceTest {
         Player player = mock(Player.class);
 
         when(player.isOnline()).thenReturn(true);
-        when(configManager.areSoundsEnabled()).thenReturn(false);
+        when(configManager.getOpenSound()).thenReturn(
+                new SoundSettings(Sound.BLOCK_SHULKER_BOX_OPEN, false, 1.0f, 1.0f));
 
         new SoundService(configManager).playOpen(player);
         new SoundService(configManager).playClose(null);
@@ -71,7 +70,8 @@ class SoundAndPermissionServiceTest {
         PermissionService permissionService = new PermissionService(configManager);
 
         org.junit.jupiter.api.Assertions.assertTrue(permissionService.has((Player) null, PermissionNode.USE));
-        org.junit.jupiter.api.Assertions.assertTrue(permissionService.canBypassBlacklist(null));
+        org.junit.jupiter.api.Assertions.assertFalse(permissionService.canBypassBlacklist(null),
+                "Выключенная система прав не снимает ограничения блэклиста");
 
     }
 
@@ -92,7 +92,12 @@ class SoundAndPermissionServiceTest {
         PermissionService permissionService = new PermissionService(configManager);
 
         org.junit.jupiter.api.Assertions.assertTrue(permissionService.has(player, PermissionNode.AUTO_COLLECT));
-        org.junit.jupiter.api.Assertions.assertFalse(permissionService.canBypassBlacklist(player));
+        org.junit.jupiter.api.Assertions.assertFalse(permissionService.canBypassBlacklist(player),
+                "Нет права обхода - блэклист работает");
+
+        when(player.hasPermission("neyshulker.bypass.blacklist")).thenReturn(true);
+        org.junit.jupiter.api.Assertions.assertTrue(permissionService.canBypassBlacklist(player),
+                "Есть право обхода - блэклист снят");
         org.junit.jupiter.api.Assertions.assertTrue(permissionService.has(console, PermissionNode.AUTO_COLLECT));
         org.junit.jupiter.api.Assertions.assertFalse(permissionService.has((CommandSender) null, PermissionNode.AUTO_COLLECT));
 

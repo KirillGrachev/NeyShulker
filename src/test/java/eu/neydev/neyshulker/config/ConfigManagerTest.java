@@ -1,12 +1,14 @@
 package eu.neydev.neyshulker.config;
 
 import eu.neydev.neyshulker.NeyShulker;
+import eu.neydev.neyshulker.service.ConsoleService;
 import eu.neydev.neyshulker.config.type.MessageKey;
 import eu.neydev.neyshulker.config.type.OpenMethodType;
+import eu.neydev.neyshulker.config.type.TitleMode;
 import eu.neydev.neyshulker.config.type.PermissionNode;
-import eu.neydev.neyshulker.config.type.SoundKey;
 import org.bukkit.Material;
 import org.bukkit.Sound;
+import org.bukkit.configuration.file.YamlConfiguration;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -14,7 +16,11 @@ import org.junit.jupiter.api.io.TempDir;
 import java.io.File;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.logging.Handler;
+import java.util.logging.LogRecord;
 import java.util.logging.Logger;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -32,15 +38,49 @@ class ConfigManagerTest {
     @TempDir
     Path tempDir;
 
+    private final List<LogRecord> consoleRecords = new ArrayList<>();
+
     private NeyShulker plugin() {
 
         NeyShulker plugin = mock(NeyShulker.class);
 
         when(plugin.getDataFolder()).thenReturn(tempDir.toFile());
-        when(plugin.getLogger()).thenReturn(Logger.getLogger("config-test"));
+        when(plugin.getLogger()).thenReturn(countingLogger());
+        when(plugin.getConfig()).thenReturn(new YamlConfiguration());
 
         return plugin;
 
+    }
+
+    private Logger countingLogger() {
+
+        Logger logger = Logger.getLogger("config-test-" + System.nanoTime());
+
+        logger.setUseParentHandlers(false);
+        logger.addHandler(new Handler() {
+
+            @Override
+            public void publish(LogRecord record) {
+                consoleRecords.add(record);
+            }
+
+            @Override
+            public void flush() {
+
+            }
+
+            @Override
+            public void close() {
+
+            }
+        });
+
+        return logger;
+
+    }
+
+    private ConfigManager configManager(NeyShulker plugin) {
+        return new ConfigManager(plugin, new ConsoleService(plugin));
     }
 
     private void writeConfig(String yaml) throws Exception {
@@ -51,16 +91,15 @@ class ConfigManagerTest {
     @DisplayName("Отсутствующий файл дает значения по умолчанию")
     void defaultsWhenFileMissing() {
 
-        ConfigManager config = new ConfigManager(plugin());
+        ConfigManager config = configManager(plugin());
 
         assertTrue(config.isPluginEnabled());
-        assertEquals(OpenMethodType.SHIFT, config.getOpenMethod());
+        assertEquals(OpenMethodType.AIR, config.getOpenMethod());
         assertEquals(10, config.getSaveInterval());
-        assertTrue(config.isNestedPrevented());
         assertTrue(config.isBlacklisted(Material.BEDROCK));
         assertFalse(config.arePermissionsEnabled());
-        assertTrue(config.areSoundsEnabled());
-        assertEquals(Sound.BLOCK_SHULKER_BOX_OPEN, config.getSound(SoundKey.OPEN));
+        assertTrue(config.getOpenSound().enabled());
+        assertEquals(Sound.BLOCK_SHULKER_BOX_OPEN, config.getOpenSound().sound());
         assertFalse(config.getMessages(MessageKey.RELOAD).isEmpty());
         assertTrue(config.getAutoCollectPriorityItems().contains(Material.DIAMOND));
         assertEquals("neyshulker.autocollect", config.getPermission(PermissionNode.AUTO_COLLECT));
@@ -86,9 +125,11 @@ class ConfigManagerTest {
                         - "NOT_A_MATERIAL"
                   auto_collect:
                     enabled: false
-                    check_interval: 40
-                    max_distance: 5.5
-                    permission_required: true
+                    scan:
+                      interval: 40
+                      distance: 5.5
+                    permission:
+                      required: true
                     priority_items:
                       - "EMERALD"
                       - "BROKEN_NAME"
@@ -104,12 +145,11 @@ class ConfigManagerTest {
                   use: "custom.use"
                 """);
 
-        ConfigManager config = new ConfigManager(plugin());
+        ConfigManager config = configManager(plugin());
 
         assertFalse(config.isPluginEnabled());
         assertEquals(OpenMethodType.SMART, config.getOpenMethod());
         assertEquals(5, config.getSaveInterval());
-        assertFalse(config.isNestedPrevented());
 
         assertTrue(config.isBlacklisted(Material.STONE));
         assertTrue(config.isBlacklisted(Material.GOLD_INGOT));
@@ -126,10 +166,11 @@ class ConfigManagerTest {
         // Префикс хранится отдельно: kleит его уже MessageService при отправке
         assertEquals("§8> ", config.getMessagePrefix());
         // В тестовом YAML ключа reload нет - работает значение по умолчанию из MessageKey
-        assertEquals("§aКонфигурация перезагружена.",
+        // ConfigManager отдает шаблон как есть: {prefix} подставит MessageService
+        assertEquals("{prefix}§aКонфигурация перезагружена.",
                 config.getMessages(MessageKey.RELOAD).get(0));
 
-        assertEquals(Sound.BLOCK_SHULKER_BOX_OPEN, config.getSound(SoundKey.OPEN),
+        assertEquals(Sound.BLOCK_SHULKER_BOX_OPEN, config.getOpenSound().sound(),
                 "Битое имя звука подменяется дефолтом");
 
         assertTrue(config.arePermissionsEnabled());
@@ -143,7 +184,7 @@ class ConfigManagerTest {
 
         writeConfig("settings:\n  shulker:\n    open_method: ALWAYS\n");
 
-        ConfigManager config = new ConfigManager(plugin());
+        ConfigManager config = configManager(plugin());
         AtomicInteger calls = new AtomicInteger();
 
         config.onReload(calls::incrementAndGet);
@@ -169,7 +210,7 @@ class ConfigManagerTest {
                       enabled: false
                 """);
 
-        ConfigManager config = new ConfigManager(plugin());
+        ConfigManager config = configManager(plugin());
 
         assertFalse(config.isBlacklistEnabled());
         assertFalse(config.isBlacklisted(Material.BEDROCK));
@@ -177,16 +218,89 @@ class ConfigManagerTest {
     }
 
     @Test
-    @DisplayName("Папка данных используется из плагина")
-    void usesPluginDataFolder() {
+    @DisplayName("Title: секция с режимом ORIGINAL")
+    void titleSectionOriginalMode() throws Exception {
 
-        NeyShulker plugin = plugin();
+        writeConfig("""
+                settings:
+                  shulker:
+                    title:
+                      mode: ORIGINAL
+                      format: "unused {shulker_name}"
+                """);
 
-        new ConfigManager(plugin);
+        ConfigManager config = configManager(plugin());
 
-        assertTrue(new File(tempDir.toFile(), "config.yml").exists()
-                || !new File(tempDir.toFile(), "config.yml").exists(),
-                "Файл создается только сервером, менеджер лишь читает");
+        assertEquals(TitleMode.ORIGINAL, config.getTitleMode());
+        assertEquals("unused {shulker_name}", config.getTitleFormat());
+
+    }
+
+    @Test
+    @DisplayName("Title: legacy-строка равносильна CUSTOM")
+    void titleLegacyStringIsCustom() throws Exception {
+
+        writeConfig("""
+                settings:
+                  shulker:
+                    title: " &#ff00ff{shulker_name} "
+                """);
+
+        ConfigManager config = configManager(plugin());
+
+        assertEquals(TitleMode.CUSTOM, config.getTitleMode());
+        assertEquals(" §x§f§f§0§0§f§f{shulker_name} ", config.getTitleFormat());
+
+    }
+
+    @Test
+    @DisplayName("Title: битый режим дает CUSTOM и предупреждение")
+    void titleInvalidModeFallsBack() throws Exception {
+
+        writeConfig("""
+                settings:
+                  shulker:
+                    title:
+                      mode: RAINBOW
+                """);
+
+        ConfigManager config = configManager(plugin());
+
+        assertEquals(TitleMode.CUSTOM, config.getTitleMode());
+        assertEquals(1, consoleRecords.size());
+
+    }
+
+    @Test
+    @DisplayName("Битые значения дают дефолты и шаблоные предупреждения")
+    void invalidValuesFallBackWithConsoleWarnings() throws Exception {
+
+        writeConfig("""
+                settings:
+                  shulker:
+                    open_method: TELEPORT
+                    save_interval: 0
+                    blacklist:
+                      items:
+                        - "NOT_A_MATERIAL"
+                  auto_collect:
+                    scan:
+                      distance: -5.0
+                sounds:
+                  open:
+                    sound: NOT_A_SOUND
+                """);
+
+        ConfigManager config = configManager(plugin());
+
+        assertEquals(OpenMethodType.AIR, config.getOpenMethod());
+        assertEquals(1, config.getSaveInterval());
+        assertEquals(0.0D, config.getAutoCollectMaxDistance());
+        assertEquals(Sound.BLOCK_SHULKER_BOX_OPEN, config.getOpenSound().sound());
+        assertTrue(config.getBlacklistedMaterials().isEmpty());
+
+        assertEquals(5, consoleRecords.size(),
+                "Каждое битое значение дает ровно одно предупреждение");
 
     }
 }

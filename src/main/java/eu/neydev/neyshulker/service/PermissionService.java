@@ -56,10 +56,21 @@ public class PermissionService {
     /**
      * Проверяет право на обход черного списка предметов.
      *
+     * Bypass-узлы инверсны функциональным: выключенная система прав означает
+     * "фичи доступны всем", но никак не "ограничения сняты со всех".
+     * Поэтому обход требует включенную систему прав И наличие права.
+     *
      * @param player проверяемый игрок
      * @return true если игрок игнорирует черный список
      */
     public boolean canBypassBlacklist(@Nullable Player player) {
-        return has(player, PermissionNode.BYPASS_BLACKLIST);
+
+        if (!configManager.arePermissionsEnabled()) {
+            return false;
+        }
+
+        return player != null
+                && player.hasPermission(configManager.getPermission(PermissionNode.BYPASS_BLACKLIST));
+
     }
 }

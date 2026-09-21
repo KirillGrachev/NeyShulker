@@ -3,7 +3,6 @@ package eu.neydev.neyshulker.command;
 import eu.neydev.neyshulker.NeyShulker;
 import eu.neydev.neyshulker.config.type.MessageKey;
 import eu.neydev.neyshulker.config.type.PermissionNode;
-import eu.neydev.neyshulker.dependency.DependencyLoader;
 import eu.neydev.neyshulker.model.ShulkerSession;
 import eu.neydev.neyshulker.service.AutoCollectService;
 import eu.neydev.neyshulker.service.MessageService;
@@ -66,8 +65,6 @@ public class ShulkerCommand implements TabExecutor {
 
             case "autocollect" -> handleAutoCollect(sender);
 
-            case "libs" -> handleLibs(sender);
-
             default -> messageService.send(sender, MessageKey.USAGE, Map.of());
 
         }
@@ -83,7 +80,7 @@ public class ShulkerCommand implements TabExecutor {
                                                 String @NotNull [] args) {
 
         if (args.length == 1) {
-            return filter(List.of("reload", "open", "info", "autocollect", "libs"), args[0]);
+            return filter(List.of("reload", "open", "info", "autocollect"), args[0]);
         }
 
         return List.of();
@@ -120,8 +117,16 @@ public class ShulkerCommand implements TabExecutor {
         int slot = player.getInventory().getHeldItemSlot();
         ItemStack item = player.getInventory().getItem(slot);
 
+        // Вторая рука - полноценный источник открытия, как и в интеракте
         if (!ShulkerUtil.isShulkerBox(item)) {
-            messageService.send(player, MessageKey.OPEN_ERROR);
+
+            slot = ShulkerUtil.OFF_HAND_SLOT;
+            item = player.getInventory().getItem(slot);
+
+        }
+
+        if (!ShulkerUtil.isShulkerBox(item)) {
+            messageService.send(player, MessageKey.NO_SHULKER_IN_HAND);
             return;
         }
 
@@ -183,41 +188,8 @@ public class ShulkerCommand implements TabExecutor {
 
     }
 
-    private void handleLibs(@NotNull CommandSender sender) {
-
-        List<DependencyLoader.LoadResult> results = plugin.getDependencyLoader().getResults();
-
-        if (results.isEmpty()) {
-
-            messageService.sendRaw(sender instanceof Player
-                    ? (Player) sender : null, "&7Runtime-библиотеки не объявлены.");
-
-            return;
-        }
-
-        for (DependencyLoader.LoadResult result : results) {
-            messageService.sendRaw(asPlayer(sender), statePrefix(result.state())
-                    + result.coordinates() + " &8- &7" + result.details());
-        }
-
-    }
-
     private @Nullable Player asPlayer(@NotNull CommandSender sender) {
         return sender instanceof Player player ? player : null;
-    }
-
-    private @NotNull String statePrefix(@NotNull DependencyLoader.LoadState state) {
-
-        return switch (state) {
-
-            case INJECTED -> "&a[+] ";
-
-            case INJECTED_ISOLATED -> "&e[~] ";
-
-            case FAILED -> "&c[-] ";
-
-        };
-
     }
 
     // --- Вспомогательные ---

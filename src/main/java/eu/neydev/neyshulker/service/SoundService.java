@@ -1,8 +1,9 @@
 package eu.neydev.neyshulker.service;
 
 import eu.neydev.neyshulker.config.ConfigManager;
-import eu.neydev.neyshulker.config.type.SoundKey;
+import eu.neydev.neyshulker.config.type.SoundSettings;
 import org.bukkit.entity.Player;
+import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 /**
@@ -19,32 +20,32 @@ public class SoundService {
     /**
      * Проигрывает звук игроку.
      *
-     * @param player получатель
-     * @param key    ключ звука
+     * @param player   получатель
+     * @param settings настройки звука из конфигурации
      */
-    public void play(@Nullable Player player, SoundKey key) {
+    public void play(@Nullable Player player, @NotNull SoundSettings settings) {
 
-        if (player == null || !player.isOnline() || !configManager.areSoundsEnabled()) {
+        if (player == null || !player.isOnline() || !settings.enabled()) {
             return;
         }
 
         player.playSound(player.getLocation(),
-                configManager.getSound(key),
-                configManager.getSoundVolume(key),
-                configManager.getSoundPitch(key)
+                settings.sound(),
+                settings.volume(),
+                settings.pitch()
         );
 
     }
 
     public void playOpen(@Nullable Player player) {
-        play(player, SoundKey.OPEN);
+        play(player, configManager.getOpenSound());
     }
 
     public void playClose(@Nullable Player player) {
-        play(player, SoundKey.CLOSE);
+        play(player, configManager.getCloseSound());
     }
 
     public void playCollect(@Nullable Player player) {
-        play(player, SoundKey.COLLECT);
+        play(player, configManager.getCollectSound());
     }
 }

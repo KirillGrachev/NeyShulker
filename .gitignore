@@ -16,3 +16,7 @@ Thumbs.db
 
 # Local release artifacts (publish via GitHub Releases, not the repo)
 *.zip
+
+# Ready-to-deploy jar at project root: convenience copy for quick tests,
+# в git не коммитится - релизные jar раздаются через GitHub Releases
+/NeyShulker-*.jar
