@@ -12,16 +12,26 @@ settings:
     open_method: AIR
 
     title:
-      # ORIGINAL - the shulker's own name: item display name, or the material
-      #            name when the item has none
+      # ORIGINAL - the shulker's own name: the item display name, or the name
+      #            from the `names` table below when the item has none
       # CUSTOM   - the format template below; HEX colors supported
       mode: CUSTOM
       format: " #f5e6ff{shulker_name} "
-      # Placeholders: {shulker_name} - display name of the item or its material name
+      # Placeholders:
+      #   {shulker_name}     - display name of the item, or its name from the
+      #                        `names` table for the viewer's client language
+      #   {shulker_material} - English material name (White Shulker Box)
+      #
+      # Name of an unnamed box per client language, the same way a placed box
+      # reads in that client. Add one key per language you serve; unknown
+      # locales fall back to `default`, then to the English material name.
+      names:
+        default: "Shulker Box"
+        ru_ru: "Шалкеровый ящик"
 
     save_interval: 10 # Ticks between automatic saves while the GUI is open (20 = 1s)
 
-    blacklist: # Items that cannot be put into a shulker box (bypass: neyshulker.bypass.blacklist)
+    blocked_items: # Items that cannot be put into a shulker box (bypass: neyshulker.bypass.blacklist)
       enabled: true
       items:
         - "BEDROCK"
@@ -44,29 +54,38 @@ settings:
       #            an empty box stays idle until filled by hand
 
     scan:
-      distance: 4.5 # Pickup radius in blocks; mining reach is ~4.5, so smaller
-        # radii leave half the drops behind when farming blocks ahead of you
+      distance: 4.5 # Pickup radius in blocks; mining reach is ~4.5, so a smaller
+      # radius leaves half the drops behind when farming blocks ahead of you
 
     waves:
       period: 10 # Ticks between waves (10 = 2 scans per second)
       players_per_wave: 5 # Players detected per wave, round robin: the load per
-        # wave stays constant no matter how many players are online
+      # wave stays constant no matter how many players are online
       actions_per_wave: 16 # Global insert budget per wave across all players
       queue_per_player: 32 # Waitlist size per player; overflow is re-detected later
 
     rules:
       only_full_inventory: false # true - collect only when the player
-        # inventory has no free slot (vacuum for full-inventory servers)
+      # inventory has no free slot (vacuum for full-inventory servers)
       merge_into_existing: true # true - a box without free slots still absorbs
-        # drops of types it already holds, merging into partial stacks
+      # drops of types it already holds, merging into partial stacks
       ignore_pickup_delay: false # true - also collect items that still have a
-        # pickup delay (fresh drops wait ~0.5s before the auto-collect may touch them)
+      # pickup delay (fresh drops wait ~0.5s before the auto-collect may touch them)
+      # Target box for a drop when several boxes qualify, top tier first:
+      #   1 - a box with a partial stack of the drop type (merge_into_existing),
+      #       the stack with the most room left absorbs the drop
+      #   2 - a box that already stores the type and has a free slot; the box
+      #       holding the most of the type wins, so each type consolidates
+      #   3 - any box with a free slot, ranked by fill_order:
+      #       BALANCED  - the most free slots wins (load spreads across boxes)
+      #       COMPACT   - the fewest free slots wins (boxes fill up one by one)
+      #       INVENTORY - the smallest slot number wins (left to right)
+      # Ties inside a tier always break by slot order, so the same inventory
+      # layout picks the same box wave after wave.
+      fill_order: BALANCED
 
     permission:
       required: false # true - only players with neyshulker.autocollect collect items
-
-    feedback:
-      messages: false # Report what was collected into the chat (useful while testing)
 
     priority_items: # Collected first (most valuable items get into the box first)
       - "NETHERITE_INGOT"
@@ -77,7 +96,7 @@ settings:
       - "GOLD_INGOT"
       - "IRON_INGOT"
 
-    blacklist: # These items are never collected
+    ignored_items: # Items the auto-collect never picks up, from the ground or the inventory
       - "BEDROCK"
       - "BARRIER"
       - "COMMAND_BLOCK"
@@ -87,7 +106,7 @@ settings:
 
 messages:
   enabled: true # Master switch for all plugin messages
-  prefix: "&#b388ffNeyShulker &8» &7" # Added in front of every message (empty = disabled)
+  prefix: "&#b388ffNeyShulker &8» &7" # Substituted into {prefix} inside the texts (empty = no prefix)
 
   no_permission:
     enabled: true
@@ -146,8 +165,32 @@ messages:
     enabled: false
     text: "{prefix}&#9dff8cThe contents of the shulker box have been saved."
 
-  auto_collect:
+  info_idle:
     enabled: true
+    text:
+      - "{prefix}&7No open shulker boxes."
+      - "&7Auto-collect: {state}"
+      - "&7Transfer queue: &f{queue}"
+
+  info_session:
+    enabled: true
+    text:
+      - "{prefix}&dShulker: &f{name}"
+      - "&dSlot: &f{slot}"
+      - "&dFree slots: &f{free}&7/&f{size}"
+      - "&dItems inside: &f{items}"
+      - "&dOpen for: &f{seconds}&7 s."
+
+  state_on:
+    enabled: true
+    text: "&aenabled"
+
+  state_off:
+    enabled: true
+    text: "&cdisabled"
+
+  auto_collect:
+    enabled: false # Report what was collected into the chat (useful while testing)
     text: "{prefix}&#8ce0ffCollected items: &f{amount}"
 
   auto_collect_full:
@@ -184,6 +227,18 @@ messages:
       enabled: true
       text:
         - "&eInvalid value at {path}: '{value}'. Using {defaultValue}."
+    legacy_path:
+      enabled: true
+      text:
+        - "&eLegacy config path {path}: use {replacement} instead."
+    command_missing:
+      enabled: true
+      text:
+        - "&eCommand {command} is missing from plugin.yml."
+    command_unregister_failed:
+      enabled: true
+      text:
+        - "&eFailed to unregister command {command}: {reason}."
 
 permissions:
   enabled: false # Enable the permission system (all checks below become active)

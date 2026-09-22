@@ -116,7 +116,6 @@ class AutoCollectServiceTest {
         when(configManager.isAutoCollectBlacklisted(any())).thenReturn(false);
         when(configManager.isBlacklistEnabled()).thenReturn(false);
         when(configManager.getAutoCollectPriorityItems()).thenReturn(List.of());
-        when(configManager.areAutoCollectMessagesEnabled()).thenReturn(false);
 
         when(player.isOnline()).thenReturn(true);
         when(player.isDead()).thenReturn(false);

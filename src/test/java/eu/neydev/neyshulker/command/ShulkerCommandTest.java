@@ -28,6 +28,8 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyMap;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -167,8 +169,8 @@ class ShulkerCommandTest {
     }
 
     @Test
-    @DisplayName("info без сессии печатает статус в raw-строках")
-    void infoWithoutSessionPrintsRaw() {
+    @DisplayName("info без сессии шлет настраиваемое сообщение info_idle")
+    void infoWithoutSessionSendsConfigMessage() {
 
         when(sessionRegistry.getSession(player)).thenReturn(null);
         when(configManager.isAutoCollectEnabled()).thenReturn(true);
@@ -176,14 +178,13 @@ class ShulkerCommandTest {
 
         commandExecutor().onCommand(player, command, "shulker", new String[]{"info"});
 
-        verify(messageService, org.mockito.Mockito.atLeastOnce()).sendRaw(any(Player.class),
-                org.mockito.ArgumentMatchers.anyString());
+        verify(messageService).send(eq(player), eq(MessageKey.INFO_IDLE), anyMap());
 
     }
 
     @Test
-    @DisplayName("info с сессией печатает имя, слот и счетчики")
-    void infoWithSessionPrintsDetails() {
+    @DisplayName("info с сессией шлет настраиваемое сообщение info_session")
+    void infoWithSessionSendsConfigMessage() {
 
         ItemStack shulker = mock(ItemStack.class);
 
@@ -197,8 +198,7 @@ class ShulkerCommandTest {
 
         commandExecutor().onCommand(player, command, "shulker", new String[]{"info"});
 
-        verify(messageService, org.mockito.Mockito.atLeast(4)).sendRaw(any(Player.class),
-                org.mockito.ArgumentMatchers.anyString());
+        verify(messageService).send(eq(player), eq(MessageKey.INFO_SESSION), anyMap());
 
     }
 

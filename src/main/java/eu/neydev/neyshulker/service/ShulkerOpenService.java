@@ -3,7 +3,7 @@ package eu.neydev.neyshulker.service;
 import eu.neydev.neyshulker.NeyShulker;
 import eu.neydev.neyshulker.config.type.MessageKey;
 import eu.neydev.neyshulker.event.ShulkerOpenEvent;
-import eu.neydev.neyshulker.inventory.ShulkerInventoryHolder;
+import eu.neydev.neyshulker.inventory.NeyShulkerViewer;
 import eu.neydev.neyshulker.model.ShulkerSession;
 import eu.neydev.neyshulker.registry.SessionRegistry;
 import eu.neydev.neyshulker.util.ShulkerUtil;
@@ -101,7 +101,7 @@ public class ShulkerOpenService {
 
         } catch (RuntimeException exception) {
 
-            plugin.getLogger().severe("Ошибка открытия шалкер-бокса: " + exception.getMessage());
+            plugin.getLogger().severe("Failed to open a shulker box: " + exception.getMessage());
             messageService.send(player, MessageKey.OPEN_ERROR, Map.of());
             rollback(player);
 
@@ -115,10 +115,10 @@ public class ShulkerOpenService {
                                          @NotNull ItemStack shulker,
                                          int slot) {
 
-        String title = titleService.resolve(shulker);
+        String title = titleService.resolve(player, shulker);
 
         return sessionRegistry.createSession(player, shulker, slot,
-                () -> new ShulkerInventoryHolder(title).getInventory());
+                () -> new NeyShulkerViewer(title).getInventory());
 
     }
 

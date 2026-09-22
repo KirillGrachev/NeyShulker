@@ -103,7 +103,7 @@ public class ShulkerCloseService {
         persistenceService.cancelAllAutoSaves();
         sessionRegistry.clear();
 
-        plugin.getLogger().info("Открытые шалкер-боксы сохранены и закрыты.");
+        plugin.getLogger().info("Open shulker boxes have been saved and closed.");
 
     }
 

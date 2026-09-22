@@ -88,23 +88,23 @@ public final class CollectRules {
      * Гейт полного инвентаря.
      *
      * @param player игрок
-     * @return true если сбор разрешен при текущей заполненности
+     * @return true если инвентарь еще не полон и сбор запрещен гейтом
      */
-    public boolean passesInventoryGate(@NotNull Player player) {
+    public boolean failsInventoryGate(@NotNull Player player) {
 
         if (!configManager.isAutoCollectOnlyWhenInventoryFull()) {
-            return true;
+            return false;
         }
 
         for (ItemStack item : player.getInventory().getStorageContents()) {
 
             if (ShulkerUtil.isEmpty(item)) {
-                return false;
+                return true;
             }
 
         }
 
-        return true;
+        return false;
 
     }
 }

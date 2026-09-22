@@ -5,10 +5,12 @@ import eu.neydev.neyshulker.config.type.OpenMethodType;
 import eu.neydev.neyshulker.config.type.PermissionNode;
 import eu.neydev.neyshulker.config.type.SoundSettings;
 import eu.neydev.neyshulker.config.type.CollectMode;
+import eu.neydev.neyshulker.config.type.FillOrderType;
 import eu.neydev.neyshulker.config.type.TitleMode;
 import org.bukkit.Material;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 /**
@@ -26,6 +28,13 @@ public interface NeyShulkerConfig {
     TitleMode getTitleMode();
 
     String getTitleFormat();
+
+    /**
+     * Названия безымянного шалкер-бокса по языкам клиента (ключи - локали
+     * в нижнем регистре вида "ru_ru", ключ "default" - запасной вариант).
+     * Значения раскрашиваются еще при загрузке.
+     */
+    Map<String, String> getTitleNames();
 
     int getSaveInterval();
 
@@ -58,7 +67,7 @@ public interface NeyShulkerConfig {
 
     boolean isAutoCollectIgnorePickupDelay();
 
-    boolean areAutoCollectMessagesEnabled();
+    FillOrderType getAutoCollectFillOrder();
 
     List<Material> getAutoCollectPriorityItems();
 

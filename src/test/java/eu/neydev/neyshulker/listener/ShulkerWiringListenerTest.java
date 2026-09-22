@@ -116,18 +116,18 @@ class ShulkerWiringListenerTest {
     @DisplayName("CleanupListener закрывает сессию на close и quit")
     void cleanupListenerClosesSession() {
 
-        eu.neydev.neyshulker.inventory.ShulkerInventoryHolder holder;
+        eu.neydev.neyshulker.inventory.NeyShulkerViewer viewer;
 
         try (MockedStatic<Bukkit> bukkit = mockStatic(Bukkit.class)) {
 
             bukkit.when(() -> Bukkit.createInventory(any(), anyInt(), anyString()))
                     .thenReturn(gui);
 
-            holder = new eu.neydev.neyshulker.inventory.ShulkerInventoryHolder("title");
+            viewer = new eu.neydev.neyshulker.inventory.NeyShulkerViewer("title");
 
         }
 
-        when(gui.getHolder()).thenReturn(holder);
+        when(gui.getHolder()).thenReturn(viewer);
         when(sessionRegistry.getSessionByInventory(gui)).thenReturn(session);
 
         ShulkerCleanupListener listener = new ShulkerCleanupListener(plugin());

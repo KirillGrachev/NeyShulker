@@ -2,12 +2,11 @@ package eu.neydev.neyshulker.event;
 
 import eu.neydev.neyshulker.NeyShulker;
 import org.bukkit.Bukkit;
-import org.bukkit.event.Event;
 import org.bukkit.event.Listener;
 import org.jetbrains.annotations.NotNull;
 
 /**
- * Единая точка регистрации слушателей и вызова собственных событий плагина.
+ * Единая точка регистрации слушателей плагина.
  */
 public class EventDispatcher {
 
@@ -28,14 +27,5 @@ public class EventDispatcher {
             Bukkit.getPluginManager().registerEvents(listener, plugin);
         }
 
-    }
-
-    /**
-     * Вызывает событие плагина.
-     *
-     * @param event вызываемое событие
-     */
-    public void callEvent(@NotNull Event event) {
-        Bukkit.getPluginManager().callEvent(event);
     }
 }

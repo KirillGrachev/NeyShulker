@@ -5,6 +5,7 @@ import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayDeque;
 import java.util.Deque;
+import java.util.function.Predicate;
 
 /**
  * Лист ожидания игрока: обнаруженные, но еще не погруженные предметы.
@@ -53,6 +54,26 @@ public final class PlayerWaitList {
 
     }
 
+    /**
+     * Удаляет элементы, удовлетворяющие фильтру.
+     *
+     * Точка немедленной чистки: когда инвентарь игрока изменился,
+     * покинувшие его предметы убираются из очереди, не дожидаясь
+     * перепроверки на фазе слива.
+     *
+     * @param filter предикат удаления
+     * @return сколько элементов удалено
+     */
+    public int removeIf(@NotNull Predicate<CollectEntry> filter) {
+
+        int before = entries.size();
+
+        entries.removeIf(filter);
+
+        return before - entries.size();
+
+    }
+
     public @Nullable CollectEntry poll() {
         return entries.pollFirst();
     }
@@ -63,9 +84,5 @@ public final class PlayerWaitList {
 
     public int size() {
         return entries.size();
-    }
-
-    public int freeSpace() {
-        return capacity - entries.size();
     }
 }

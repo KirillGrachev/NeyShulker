@@ -17,7 +17,6 @@ public class ShulkerCloseEvent extends NeyShulkerEvent {
     private final Player player;
     private final ShulkerSession session;
     private final ItemStack savedItem;
-    private final long durationMillis;
 
     public ShulkerCloseEvent(@NotNull Player player,
                              @NotNull ShulkerSession session,
@@ -26,7 +25,6 @@ public class ShulkerCloseEvent extends NeyShulkerEvent {
         this.player = player;
         this.session = session;
         this.savedItem = savedItem;
-        this.durationMillis = System.currentTimeMillis() - session.openedAt();
 
     }
 
@@ -40,13 +38,6 @@ public class ShulkerCloseEvent extends NeyShulkerEvent {
 
     public @NotNull ItemStack getSavedItem() {
         return savedItem.clone();
-    }
-
-    /**
-     * @return сколько миллисекунд шалкер-бокс был открыт
-     */
-    public long getDurationMillis() {
-        return durationMillis;
     }
 
     @Override

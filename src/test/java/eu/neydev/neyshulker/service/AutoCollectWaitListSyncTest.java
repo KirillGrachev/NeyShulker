@@ -35,15 +35,15 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockStatic;
-import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 /**
- * Проверка волновой модели автосбора: ротация игроков по ломтикам,
- * глобальный бюджет погружений и потолок листа ожидания.
+ * Проверка немедленной синхронизации листа ожидания: элементы предметов,
+ * покинувших инвентарь, убираются из очереди переноса сразу, а не ждут
+ * перепроверки на фазе слива.
  */
-class AutoCollectWaveTest {
+class AutoCollectWaitListSyncTest {
 
     private final ConfigManager configManager = mock(ConfigManager.class);
     private final SessionRegistry sessionRegistry = mock(SessionRegistry.class);
@@ -56,7 +56,8 @@ class AutoCollectWaveTest {
     /**
      * Игрок с шалкер-боксом в хотбаре и своим миром.
      */
-    private record Fixture(Player player, World world, Inventory boxContents, UUID playerId) {
+    private record Fixture(Player player, PlayerInventory inventory,
+                           Inventory boxContents, UUID playerId) {
     }
 
     private Fixture fixture(Item... drops) {
@@ -93,7 +94,7 @@ class AutoCollectWaveTest {
             when(drop.getLocation()).thenReturn(dropLocation);
         }
 
-        return new Fixture(player, world, boxContents, playerId);
+        return new Fixture(player, inventory, boxContents, playerId);
 
     }
 
@@ -126,10 +127,6 @@ class AutoCollectWaveTest {
 
     }
 
-    /**
-     * Дроп, который после remove() честно становится мертвым:
-     * устаревшие элементы листа ожидания должны отбрасываться.
-     */
     private Item drop(Material material, int amount) {
 
         Item item = mock(Item.class);
@@ -150,11 +147,15 @@ class AutoCollectWaveTest {
 
     }
 
-    private AutoCollectService service(int playersPerWave, int actionsPerWave, int queuePerPlayer) {
+    /**
+     * Сервис с настраиваемым бюджетом: 0 - волна только детектит,
+     * элементы листа ожидания остаются до следующих волн.
+     */
+    private AutoCollectService service(int actionsPerWave) {
 
         NeyShulker plugin = mock(NeyShulker.class);
 
-        when(plugin.getLogger()).thenReturn(java.util.logging.Logger.getLogger("wave-test"));
+        when(plugin.getLogger()).thenReturn(java.util.logging.Logger.getLogger("sync-test"));
 
         when(configManager.isPluginEnabled()).thenReturn(true);
         when(configManager.isAutoCollectEnabled()).thenReturn(true);
@@ -164,9 +165,9 @@ class AutoCollectWaveTest {
         when(configManager.getAutoCollectMode()).thenReturn(CollectMode.ALL);
         when(configManager.getAutoCollectMaxDistance()).thenReturn(3.0D);
         when(configManager.isAutoCollectIgnorePickupDelay()).thenReturn(false);
-        when(configManager.getPlayersPerWave()).thenReturn(playersPerWave);
+        when(configManager.getPlayersPerWave()).thenReturn(5);
         when(configManager.getActionsPerWave()).thenReturn(actionsPerWave);
-        when(configManager.getQueuePerPlayer()).thenReturn(queuePerPlayer);
+        when(configManager.getQueuePerPlayer()).thenReturn(32);
         when(configManager.isAutoCollectBlacklisted(any())).thenReturn(false);
         when(configManager.isBlacklistEnabled()).thenReturn(false);
         when(configManager.getAutoCollectPriorityItems()).thenReturn(List.of());
@@ -177,112 +178,197 @@ class AutoCollectWaveTest {
 
     }
 
-    private MockedStatic<Bukkit> bukkit(Fixture... fixtures) {
+    private MockedStatic<Bukkit> bukkit(Fixture fixture) {
 
         MockedStatic<Bukkit> bukkit = mockStatic(Bukkit.class);
 
         bukkit.when(Bukkit::getPluginManager).thenReturn(pluginManager);
-        bukkit.when(Bukkit::getOnlinePlayers)
-                .thenAnswer(answer -> List.copyOf(java.util.Arrays.stream(fixtures)
-                        .map(Fixture::player).toList()));
-
-        for (Fixture fixture : fixtures) {
-            bukkit.when(() -> Bukkit.getPlayer(fixture.playerId())).thenReturn(fixture.player());
-        }
+        bukkit.when(Bukkit::getOnlinePlayers).thenReturn(List.of(fixture.player()));
+        bukkit.when(() -> Bukkit.getPlayer(fixture.playerId())).thenReturn(fixture.player());
 
         return bukkit;
 
     }
 
     @Test
-    @DisplayName("Волна детектит только ломтик игроков, ротация охватывает всех")
-    void waveDetectsSliceAndRotates() {
+    @DisplayName("Предмет покинул слот - элемент сразу убирается из очереди")
+    void syncRemovesEntryWhenItemLeftInventory() {
 
-        Item dropA = drop(Material.DIAMOND, 1);
-        Item dropB = drop(Material.DIAMOND, 1);
+        Fixture fixture = fixture();
 
-        Fixture first = fixture(dropA);
-        Fixture second = fixture(dropB);
+        fixture.inventory().setItem(5, new FakeItemStack(Material.DIAMOND, 3));
 
-        AutoCollectService service = service(1, 64, 32);
+        AutoCollectService service = service(0);
 
-        try (MockedStatic<Bukkit> bukkit = bukkit(first, second)) {
+        try (MockedStatic<Bukkit> bukkit = bukkit(fixture)) {
 
             service.wave();
 
-            verify(first.world()).getEntitiesByClass(Item.class);
-            verify(second.world(), never()).getEntitiesByClass(Item.class);
-            verify(dropA).remove();
-            verify(dropB, never()).remove();
+            assertEquals(1, service.waitListSize(fixture.player()),
+                    "Детекция поставила предмет в очередь");
 
-            service.wave();
+            fixture.inventory().setItem(5, null);
 
-            verify(second.world()).getEntitiesByClass(Item.class);
-            verify(dropB).remove();
+            service.syncWaitList(fixture.player());
+
+            assertEquals(0, service.waitListSize(fixture.player()),
+                    "Покинувший инвентарь предмет немедленно убран из очереди переноса");
+            assertNull(fixture.boxContents().getItem(0), "В бокс ничего не перенесено");
 
         }
 
     }
 
     @Test
-    @DisplayName("Бюджет действий на волну дозирует погружение")
-    void drainRespectsActionsBudget() {
+    @DisplayName("Замена в слоте попадает в очередь только через новую детекцию")
+    void replacementIsQueuedOnlyByFreshDetection() {
 
-        Item first = drop(Material.DIAMOND, 3);
-        Item second = drop(Material.DIAMOND, 2);
+        Fixture fixture = fixture();
 
-        Fixture fixture = fixture(first, second);
+        fixture.inventory().setItem(5, new FakeItemStack(Material.DIAMOND, 3));
 
-        AutoCollectService service = service(5, 3, 32);
+        AutoCollectService service = service(0);
 
         try (MockedStatic<Bukkit> bukkit = bukkit(fixture)) {
 
             service.wave();
 
-            verify(first).remove();
-            verify(second, never()).remove();
+            assertEquals(1, service.waitListSize(fixture.player()));
+
+            // Предмет унесли, на его место положили другой стек того же типа
+            fixture.inventory().setItem(5, null);
+            service.syncWaitList(fixture.player());
+            assertEquals(0, service.waitListSize(fixture.player()));
+
+            fixture.inventory().setItem(5, new FakeItemStack(Material.DIAMOND, 8));
+            service.syncWaitList(fixture.player());
+            assertEquals(0, service.waitListSize(fixture.player()),
+                    "Синхронизация только убирает элементы, ничего не добавляя");
+
+            when(configManager.getActionsPerWave()).thenReturn(64);
+
+            service.wave();
 
             ItemStack stored = fixture.boxContents().getItem(0);
 
-            assertNotNull(stored, "Первый дроп должен успеть погрузиться в рамках бюджета");
-            assertEquals(3, stored.getAmount());
-
-            service.wave();
-
-            verify(second).remove();
-
-            ItemStack merged = fixture.boxContents().getItem(0);
-
-            assertNotNull(merged);
-            assertEquals(5, merged.getAmount(), "Остаток доезжает на следующей волне");
+            assertNotNull(stored, "Замена доехала в бокс через свежую детекцию");
+            assertEquals(8, stored.getAmount());
 
         }
 
     }
 
     @Test
-    @DisplayName("Лист ожидания ограничен queue_per_player, лишнее не теряется")
-    void queueCapacityLimitsWaitList() {
+    @DisplayName("Валидный элемент переживает синхронизацию и переносится")
+    void validEntrySurvivesSync() {
 
-        Item first = drop(Material.DIAMOND, 3);
-        Item second = drop(Material.EMERALD, 2);
+        Fixture fixture = fixture();
 
-        Fixture fixture = fixture(first, second);
+        fixture.inventory().setItem(5, new FakeItemStack(Material.DIAMOND, 3));
 
-        AutoCollectService service = service(5, 64, 1);
+        AutoCollectService service = service(0);
 
         try (MockedStatic<Bukkit> bukkit = bukkit(fixture)) {
 
             service.wave();
 
-            verify(first).remove();
-            verify(second, never()).remove();
-            assertNull(fixture.boxContents().getItem(1), "Переполненный лист не грузит второй дроп");
+            service.syncWaitList(fixture.player());
+
+            assertEquals(1, service.waitListSize(fixture.player()),
+                    "Предмет на месте - элемент остается в очереди");
+
+            when(configManager.getActionsPerWave()).thenReturn(64);
 
             service.wave();
 
-            verify(second).remove();
-            assertNotNull(fixture.boxContents().getItem(1), "На следующей волне второй дроп обнаружен заново");
+            ItemStack stored = fixture.boxContents().getItem(0);
+
+            assertNotNull(stored);
+            assertEquals(3, stored.getAmount());
+            assertNull(fixture.inventory().getItem(5), "Слот игрока освобожден");
+
+        }
+
+    }
+
+    @Test
+    @DisplayName("Синхронизация инвентаря не трогает элементы с земли")
+    void syncKeepsGroundEntries() {
+
+        Item item = drop(Material.DIAMOND, 2);
+        Fixture fixture = fixture(item);
+
+        AutoCollectService service = service(0);
+
+        try (MockedStatic<Bukkit> bukkit = bukkit(fixture)) {
+
+            service.wave();
+
+            assertEquals(1, service.waitListSize(fixture.player()));
+
+            service.syncWaitList(fixture.player());
+
+            assertEquals(1, service.waitListSize(fixture.player()),
+                    "Дроп на земле не зависит от изменений инвентаря");
+
+            when(configManager.getActionsPerWave()).thenReturn(64);
+
+            service.wave();
+
+            verify(item).remove();
+            assertNotNull(fixture.boxContents().getItem(0));
+
+        }
+
+    }
+
+    @Test
+    @DisplayName("clearWaitList полностью очищает очередь")
+    void clearWaitListEmptiesQueue() {
+
+        Item item = drop(Material.DIAMOND, 2);
+        Fixture fixture = fixture(item);
+
+        fixture.inventory().setItem(5, new FakeItemStack(Material.EMERALD, 1));
+
+        AutoCollectService service = service(0);
+
+        try (MockedStatic<Bukkit> bukkit = bukkit(fixture)) {
+
+            service.wave();
+
+            assertEquals(2, service.waitListSize(fixture.player()));
+
+            service.clearWaitList(fixture.player());
+
+            assertEquals(0, service.waitListSize(fixture.player()));
+
+        }
+
+    }
+
+    @Test
+    @DisplayName("Предмет стал исключенным после reload - элемент убирается")
+    void syncRemovesEntryBlacklistedAfterReload() {
+
+        Fixture fixture = fixture();
+
+        fixture.inventory().setItem(5, new FakeItemStack(Material.DIAMOND, 3));
+
+        AutoCollectService service = service(0);
+
+        try (MockedStatic<Bukkit> bukkit = bukkit(fixture)) {
+
+            service.wave();
+
+            assertEquals(1, service.waitListSize(fixture.player()));
+
+            when(configManager.isAutoCollectBlacklisted(Material.DIAMOND)).thenReturn(true);
+
+            service.syncWaitList(fixture.player());
+
+            assertEquals(0, service.waitListSize(fixture.player()),
+                    "Исключенный предмет не должен дожидаться переноса в очереди");
 
         }
 

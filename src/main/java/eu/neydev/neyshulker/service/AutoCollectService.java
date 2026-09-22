@@ -95,15 +95,15 @@ public class AutoCollectService {
     public void start() {
 
         if (!configManager.isPluginEnabled() || !configManager.isAutoCollectEnabled()) {
-            plugin.getLogger().info("Автосбор отключен в конфигурации.");
+            plugin.getLogger().info("Auto-collect is disabled in the configuration.");
             return;
         }
 
         collectTask.start(20L, configManager.getWavePeriod());
 
-        plugin.getLogger().info("Автосбор запущен (волны каждые "
-                + configManager.getWavePeriod() + " тиков, "
-                + configManager.getPlayersPerWave() + " игроков за волну).");
+        plugin.getLogger().info("Auto-collect started (waves every "
+                + configManager.getWavePeriod() + " ticks, "
+                + configManager.getPlayersPerWave() + " players per wave).");
 
     }
 
@@ -217,7 +217,7 @@ public class AutoCollectService {
             return;
         }
 
-        if (!rules.passesInventoryGate(player)) {
+        if (rules.failsInventoryGate(player)) {
             return;
         }
 
@@ -334,7 +334,7 @@ public class AutoCollectService {
             return 0;
         }
 
-        if (!rules.passesInventoryGate(player)) {
+        if (rules.failsInventoryGate(player)) {
             return 0;
         }
 
@@ -450,8 +450,8 @@ public class AutoCollectService {
     /**
      * Погружает один предмет из области хранения инвентаря.
      *
-     * Слот между детекцией и сливом мог измениться, поэтому сверяется
-     * тип предмета в слоте с типом, записанным в листе ожидания.
+     * Слот между детекцией и сливом мог измениться, поэтому элемент
+     * дополнительно сверяется с текущим состоянием слота.
      */
     private DrainStep drainInventoryEntry(@NotNull Player player,
                                           @NotNull PlayerInventory inventory,
@@ -460,8 +460,7 @@ public class AutoCollectService {
 
         ItemStack stack = inventory.getItem(entry.slot());
 
-        if (ShulkerUtil.isEmpty(stack) || stack.getType() != entry.material()
-                || rules.isExcluded(player, stack)) {
+        if (inventoryEntryStale(player, stack, entry)) {
             return DrainStep.none();
         }
 
@@ -488,6 +487,81 @@ public class AutoCollectService {
         }
 
         return DrainStep.moved(moved);
+
+    }
+
+    /**
+     * Покинул ли предмет элемента свое место в инвентаре: слот пуст,
+     * тип предмета не совпадает с записанным при детекции или предмет
+     * стал исключенным (блэклист, шалкер-бокс).
+     *
+     * Общий критерий для фазы слива и для немедленной синхронизации
+     * листа ожидания по событиям инвентаря.
+     */
+    private boolean inventoryEntryStale(@NotNull Player player,
+                                        @Nullable ItemStack stack,
+                                        @NotNull CollectEntry entry) {
+
+        return ShulkerUtil.isEmpty(stack)
+                || stack.getType() != entry.material()
+                || rules.isExcluded(player, stack);
+
+    }
+
+    /**
+     * Немедленно сверяет лист ожидания с текущим инвентарем игрока.
+     *
+     * Вызывается слушателем WaitListSyncListener, когда инвентарь изменился
+     * (клик, drag, выброс, установка блока, поедание, поломка, обмен рук):
+     * элемент, чей предмет покинул свое место, убирается из очереди сразу
+     * и не может быть перенесен случайно между волнами. Элементы с земли
+     * не трогаются - состояние дропа перечитывается на фазе слива.
+     *
+     * @param player игрок
+     */
+    public void syncWaitList(@NotNull Player player) {
+
+        PlayerWaitList waitList = waitLists.get(player.getUniqueId());
+
+        if (waitList == null) {
+            return;
+        }
+
+        PlayerInventory inventory = player.getInventory();
+
+        waitList.removeIf(entry -> !entry.isGround()
+                && inventoryEntryStale(player, inventory.getItem(entry.slot()), entry));
+
+        if (waitList.isEmpty()) {
+            waitLists.remove(player.getUniqueId());
+        }
+
+    }
+
+    /**
+     * Полностью очищает лист ожидания игрока.
+     *
+     * Точка входа для событий, после которых очередь целиком теряет смысл:
+     * смерть (инвентарь выпал на землю и будет заново обнаружен как дроп).
+     *
+     * @param player игрок
+     */
+    public void clearWaitList(@NotNull Player player) {
+        waitLists.remove(player.getUniqueId());
+    }
+
+    /**
+     * Размер листа ожидания игрока.
+     * Публичен для проверяемых тестов и диагностики в /shulker info.
+     *
+     * @param player игрок
+     * @return число элементов в очереди переноса
+     */
+    public int waitListSize(@NotNull Player player) {
+
+        PlayerWaitList waitList = waitLists.get(player.getUniqueId());
+
+        return waitList == null ? 0 : waitList.size();
 
     }
 
@@ -520,7 +594,7 @@ public class AutoCollectService {
     /**
      * Полный немедленный проход для одного игрока: детекция всех источников
      * и слив без ограничения бюджета. Точка входа для тестов и разовых
-     * вызовов; в бою работа идет волнами через {@link #tick()}.
+     * вызовов; в бою работа идет волнами через {@link #wave()}.
      *
      * @param player игрок
      */
@@ -567,10 +641,8 @@ public class AutoCollectService {
 
     private void notify(@NotNull Player player, int collected, boolean noSpace) {
 
-        if (!configManager.areAutoCollectMessagesEnabled()) {
-            return;
-        }
-
+        // Выключенное сообщение дает пустой список строк: MessageService сам
+        // промолчит, отдельный тумблер автосбору больше не нужен
         if (collected > 0) {
             messageService.send(player, MessageKey.AUTO_COLLECT,
                     Map.of("amount", String.valueOf(collected)));

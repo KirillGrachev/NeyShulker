@@ -149,8 +149,9 @@ public class ShulkerCommand implements TabExecutor {
             boolean autoCollectActive = plugin.getConfigManager().isAutoCollectEnabled()
                     && autoCollectService.isEnabledFor(player);
 
-            messageService.sendRaw(player, "&7Открытых шалкер-боксов нет.");
-            messageService.sendRaw(player, "&7Автосбор: " + state(autoCollectActive));
+            messageService.send(player, MessageKey.INFO_IDLE, Map.of(
+                    "state", state(autoCollectActive),
+                    "queue", String.valueOf(autoCollectService.waitListSize(player))));
 
             return;
 
@@ -159,13 +160,13 @@ public class ShulkerCommand implements TabExecutor {
         ItemStack shulker = session.shulkerItem();
         int freeSlots = ShulkerUtil.countFreeSlots(shulker);
 
-        messageService.sendRaw(player, "&dШалкер: &f" + session.getShulkerName());
-        messageService.sendRaw(player, "&dСлот: &f" + session.getSlot());
-        messageService.sendRaw(player, "&dСвободно слотов: &f" + freeSlots + "&7/&f"
-                + ShulkerUtil.SHULKER_SIZE);
-        messageService.sendRaw(player, "&dПредметов внутри: &f" + ShulkerUtil.countItems(shulker));
-        messageService.sendRaw(player, "&dОткрыт: &f"
-                + (System.currentTimeMillis() - session.openedAt()) / 1000L + "&7 сек.");
+        messageService.send(player, MessageKey.INFO_SESSION, Map.of(
+                "name", session.getShulkerName(),
+                "slot", String.valueOf(session.getSlot()),
+                "free", String.valueOf(freeSlots),
+                "size", String.valueOf(ShulkerUtil.SHULKER_SIZE),
+                "items", String.valueOf(ShulkerUtil.countItems(shulker)),
+                "seconds", String.valueOf((System.currentTimeMillis() - session.openedAt()) / 1000L)));
 
     }
 
@@ -187,11 +188,6 @@ public class ShulkerCommand implements TabExecutor {
 
     }
 
-    private @Nullable Player asPlayer(@NotNull CommandSender sender) {
-        return sender instanceof Player player ? player : null;
-    }
-
-
     private @NotNull List<String> filter(@NotNull List<String> source, @NotNull String token) {
 
         String prefix = token.toLowerCase(Locale.ROOT);
@@ -209,7 +205,16 @@ public class ShulkerCommand implements TabExecutor {
 
     }
 
+    /**
+     * Готовое слово-статус для плейсхолдера {state}: строки сообщения
+     * state_on / state_off собираются через MessageService, чтобы оставались
+     * настраиваемыми из конфигурации.
+     *
+     * @param enabled состояние автосбора
+     * @return текст статуса для подстановки
+     */
     private @NotNull String state(boolean enabled) {
-        return enabled ? "&aвключен" : "&cвыключен";
+        return String.join(" ", messageService.build(
+                enabled ? MessageKey.STATE_ON : MessageKey.STATE_OFF, Map.of()));
     }
 }

@@ -1,7 +1,7 @@
 package eu.neydev.neyshulker.listener;
 
 import eu.neydev.neyshulker.NeyShulker;
-import eu.neydev.neyshulker.inventory.ShulkerInventoryHolder;
+import eu.neydev.neyshulker.inventory.NeyShulkerViewer;
 import eu.neydev.neyshulker.model.ShulkerSession;
 import eu.neydev.neyshulker.registry.SessionRegistry;
 import eu.neydev.neyshulker.service.AutoCollectService;
@@ -35,7 +35,7 @@ public class ShulkerCleanupListener implements Listener {
     @EventHandler(priority = EventPriority.MONITOR)
     public void onInventoryClose(@NotNull InventoryCloseEvent event) {
 
-        if (!(event.getInventory().getHolder() instanceof ShulkerInventoryHolder)) {
+        if (!(event.getInventory().getHolder() instanceof NeyShulkerViewer)) {
             return;
         }
 

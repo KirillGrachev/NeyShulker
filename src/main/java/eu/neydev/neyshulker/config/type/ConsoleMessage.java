@@ -10,13 +10,22 @@ import org.jetbrains.annotations.NotNull;
 public enum ConsoleMessage {
 
     UNKNOWN_SOUND("unknown_sound", true,
-            "&eНеизвестный звук в {path}: '{value}'. Использован {defaultValue}."),
+            "&eUnknown sound at {path}: '{value}'. Using {defaultValue}."),
 
     UNKNOWN_MATERIAL("unknown_material", true,
-            "&eНеизвестный предмет в {path}: '{value}'. Значение пропущено."),
+            "&eUnknown material at {path}: '{value}'. Skipped."),
 
     INVALID_VALUE("invalid_value", true,
-            "&eНекорректное значение в {path}: '{value}'. Использовано {defaultValue}.");
+            "&eInvalid value at {path}: '{value}'. Using {defaultValue}."),
+
+    LEGACY_PATH("legacy_path", true,
+            "&eLegacy config path {path}: use {replacement} instead."),
+
+    COMMAND_MISSING("command_missing", true,
+            "&eCommand {command} is missing from plugin.yml."),
+
+    COMMAND_UNREGISTER_FAILED("command_unregister_failed", true,
+            "&eFailed to unregister command {command}: {reason}.");
 
     private final String configKey;
     private final boolean defaultEnabled;

@@ -1,0 +1,40 @@
+name: Release
+
+# A tag push is not a branch push: the old single workflow listened to
+# branches only, so the tag-guarded release job was skipped on main and never
+# triggered on tags at all. Own workflow own trigger - releases really happen.
+on:
+  push:
+    tags: ['v*']
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false # a publish in flight is never cancelled
+
+jobs:
+  release:
+    name: GitHub release on tag
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+          cache: maven
+
+      # verify = compile + tests + jacoco report + coverage gate (jacoco.line.minimum)
+      - name: Build and test
+        run: mvn -B -ntp verify
+
+      - name: Publish release with jar
+        uses: softprops/action-gh-release@v2
+        with:
+          files: target/NeyShulker-*.jar
+          generate_release_notes: true

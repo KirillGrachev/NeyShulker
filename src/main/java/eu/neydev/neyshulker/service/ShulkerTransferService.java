@@ -39,7 +39,7 @@ public class ShulkerTransferService {
             return;
         }
 
-        persistenceService.markAndSchedule(session);
+        persistenceService.scheduleSave(session);
 
     }
 

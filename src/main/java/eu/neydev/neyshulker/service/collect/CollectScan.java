@@ -2,11 +2,11 @@ package eu.neydev.neyshulker.service.collect;
 
 import eu.neydev.neyshulker.config.ConfigManager;
 import eu.neydev.neyshulker.config.type.CollectMode;
+import eu.neydev.neyshulker.config.type.FillOrderType;
 import eu.neydev.neyshulker.model.ShulkerSession;
 import eu.neydev.neyshulker.service.InventoryTransferService;
 import eu.neydev.neyshulker.service.ShulkerPersistenceService;
 import eu.neydev.neyshulker.util.ShulkerUtil;
-import org.bukkit.Material;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.PlayerInventory;
@@ -14,7 +14,6 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -25,6 +24,12 @@ import java.util.Map;
  * Держит рабочее содержимое боксов в памяти: мета читается один раз на бокс
  * за скан, последовательные вставки видят накопленный результат, физическая
  * запись и синхронизация клиента происходят один раз в {@link #flush()}.
+ *
+ * Выбор цели детерминирован: боксы просматриваются в порядке слотов инвентаря
+ * (вторая рука последняя), а между кандидатами внутри яруса решают явные
+ * правила {@link #targetFor(ItemStack)}. Один и тот же расклад инвентаря
+ * всегда дает один и тот же бокс, от волны к волне и от перезапуска к
+ * перезапуску, — поведение можно объяснить игроку и проверить тестом.
  */
 public final class CollectScan {
 
@@ -35,7 +40,7 @@ public final class CollectScan {
 
     private final SessionCollectTarget sessionTarget;
     private final Map<Integer, BoxCollectTarget> boxes = new HashMap<>();
-    private final List<Integer> order = new ArrayList<>();
+    private final List<Integer> slots = new ArrayList<>();
 
     public CollectScan(@NotNull Player player,
                        @Nullable ShulkerSession session,
@@ -66,13 +71,22 @@ public final class CollectScan {
     }
 
     /**
-     * Подбирает цель под предмет с учетом глобального режима автосбора.
+     * Подбирает цель под предмет по ярусам предпочтения.
      *
-     * Порядок выбора: бокс с частичным стеком того же типа (компактация),
-     * затем бокс со свободным слотом, предпочтительно уже хранящий тип.
-     * MATCHING гейтует допуск для обоих источников: тип обязан быть уже
-     * известным какому-то приемнику; полные стеки типа не блокируют сбор,
-     * пока есть свободные слоты.
+     * Ярус 1 (rules.merge_into_existing): бокс с частичным стеком того же
+     * типа - побеждает стек с наибольшим остатком места, дроп вливается
+     * без нового слота и без распыления по боксам.
+     * Ярус 2: бокс со свободным слотом, уже хранящий тип - побеждает бокс
+     * с наибольшим количеством предмета того же типа, так тип стягивается
+     * в один бокс, а не размазывается по всем.
+     * Ярус 3: любой бокс со свободным слотом (в MATCHING - только если тип
+     * уже известен какому-то боксу) - ранжирует стратегия rules.fill_order:
+     * BALANCED размазывает нагрузку, COMPACT заполняет боксы по одному,
+     * INVENTORY держит порядок слотов инвентаря.
+     *
+     * При равенстве внутри яруса решает порядок слотов: побеждает меньший слот,
+     * поэтому выбор всегда воспроизводим. Открытое GUI приоритетнее боксов:
+     * игрок смотрит на него и ждет пополнения именно туда.
      *
      * @param stack предмет
      * @return цель или null, если допуска или места нет
@@ -93,16 +107,48 @@ public final class CollectScan {
 
         if (configManager.isAutoCollectMergeIntoExisting()) {
 
-            for (Integer slot : order) {
+            BoxCollectTarget mergeTarget = null;
+            int bestRoom = 0;
 
-                BoxCollectTarget target = boxes.get(slot);
+            for (Integer slot : slots) {
 
-                if (hasMergeRoom(target, stack)) {
-                    return target;
+                int room = mergeRoom(boxes.get(slot), stack);
+
+                if (room > bestRoom) {
+                    mergeTarget = boxes.get(slot);
+                    bestRoom = room;
                 }
 
             }
 
+            if (mergeTarget != null) {
+                return mergeTarget;
+            }
+
+        }
+
+        BoxCollectTarget typeTarget = null;
+        int bestAmount = 0;
+
+        for (Integer slot : slots) {
+
+            BoxCollectTarget target = boxes.get(slot);
+
+            if (ShulkerUtil.countFreeSlots(contentsOf(target)) <= 0) {
+                continue;
+            }
+
+            int amount = amountOf(target, stack);
+
+            if (amount > bestAmount) {
+                typeTarget = target;
+                bestAmount = amount;
+            }
+
+        }
+
+        if (typeTarget != null) {
+            return typeTarget;
         }
 
         boolean typeKnown = mode != CollectMode.MATCHING || holdsType(stack);
@@ -111,27 +157,44 @@ public final class CollectScan {
             return null;
         }
 
-        BoxCollectTarget anyFree = null;
+        return freeTarget();
 
-        for (Integer slot : order) {
+    }
+
+    /**
+     * Нижний ярус: бокс со свободным слотом по стратегии fill_order.
+     *
+     * @return цель или null, если свободных слотов нет ни в одном боксе
+     */
+    private @Nullable BoxCollectTarget freeTarget() {
+
+        FillOrderType fillOrder = configManager.getAutoCollectFillOrder();
+        BoxCollectTarget best = null;
+        int bestScore = 0;
+
+        for (Integer slot : slots) {
 
             BoxCollectTarget target = boxes.get(slot);
+            int freeSlots = ShulkerUtil.countFreeSlots(contentsOf(target));
 
-            if (ShulkerUtil.countFreeSlots(contentsOf(target)) <= 0) {
+            if (freeSlots <= 0) {
                 continue;
             }
 
-            if (mode == CollectMode.MATCHING && holdsTypeIn(target, stack)) {
+            if (fillOrder == FillOrderType.INVENTORY) {
                 return target;
             }
 
-            if (anyFree == null) {
-                anyFree = target;
+            int score = fillOrder == FillOrderType.BALANCED ? freeSlots : -freeSlots;
+
+            if (best == null || score > bestScore) {
+                best = target;
+                bestScore = score;
             }
 
         }
 
-        return anyFree;
+        return best;
 
     }
 
@@ -163,21 +226,7 @@ public final class CollectScan {
 
         for (BoxCollectTarget target : boxes.values()) {
 
-            if (holdsTypeIn(target, stack)) {
-                return true;
-            }
-
-        }
-
-        return false;
-
-    }
-
-    private boolean holdsTypeIn(@NotNull BoxCollectTarget target, @NotNull ItemStack stack) {
-
-        for (ItemStack slot : contentsOf(target)) {
-
-            if (slot != null && slot.isSimilar(stack)) {
+            if (amountOf(target, stack) > 0) {
                 return true;
             }
 
@@ -188,12 +237,54 @@ public final class CollectScan {
     }
 
     /**
-     * Записывает измененные боксы и отмечает сессию; resync клиента - один раз.
+     * Сколько предметов того же типа уже хранит бокс (сумма по стекам).
+     */
+    private int amountOf(@NotNull BoxCollectTarget target, @NotNull ItemStack stack) {
+
+        int amount = 0;
+
+        for (ItemStack slot : contentsOf(target)) {
+
+            if (slot != null && slot.isSimilar(stack)) {
+                amount += slot.getAmount();
+            }
+
+        }
+
+        return amount;
+
+    }
+
+    /**
+     * Наибольший остаток места в частичном стеке того же типа.
+     *
+     * @return место в предметах или 0, если вливать некуда
+     */
+    private int mergeRoom(@NotNull BoxCollectTarget target, @NotNull ItemStack stack) {
+
+        int room = 0;
+
+        for (ItemStack slot : contentsOf(target)) {
+
+            if (slot == null || !slot.isSimilar(stack) || slot.getAmount() >= slot.getMaxStackSize()) {
+                continue;
+            }
+
+            room = Math.max(room, slot.getMaxStackSize() - slot.getAmount());
+
+        }
+
+        return room;
+
+    }
+
+    /**
+     * Записывает измененные боксы и планирует сохранение сессии; resync клиента - один раз.
      */
     public void flush() {
 
         if (sessionTarget != null && sessionTarget.isUsed()) {
-            persistenceService.markAndSchedule(sessionTarget.getSession());
+            persistenceService.scheduleSave(sessionTarget.getSession());
         }
 
         boolean anyModified = false;
@@ -218,29 +309,17 @@ public final class CollectScan {
 
         PlayerInventory inventory = player.getInventory();
         ItemStack[] contents = inventory.getContents();
-        List<int[]> scored = new ArrayList<>();
 
         for (int slot = 0; slot < contents.length; slot++) {
-
-            if (ShulkerUtil.isShulkerBox(contents[slot])) {
-                addBox(scored, slot, contents[slot]);
-            }
-
+            addBox(slot, contents[slot]);
         }
 
-        // Вторая рука - полноценное место для шалкера
-        addBox(scored, ShulkerUtil.OFF_HAND_SLOT,
-                inventory.getItem(ShulkerUtil.OFF_HAND_SLOT));
-
-        scored.sort(Comparator.comparingInt((int[] pair) -> pair[1]).reversed());
-
-        for (int[] pair : scored) {
-            order.add(pair[0]);
-        }
+        // Вторая рука - полноценное место для шалкера; слот 40 и так последний
+        addBox(ShulkerUtil.OFF_HAND_SLOT, inventory.getItem(ShulkerUtil.OFF_HAND_SLOT));
 
     }
 
-    private void addBox(@NotNull List<int[]> scored, int slot, @Nullable ItemStack box) {
+    private void addBox(int slot, @Nullable ItemStack box) {
 
         if (!ShulkerUtil.isShulkerBox(box)) {
             return;
@@ -253,45 +332,7 @@ public final class CollectScan {
         }
 
         boxes.put(slot, new BoxCollectTarget(player, slot, boxContents, transferService));
-        scored.add(new int[]{slot, score(boxContents)});
-
-    }
-
-    private int score(ItemStack @NotNull [] contents) {
-        return ShulkerUtil.countFreeSlots(contents) + (containsPriorityItem(contents) ? 1000 : 0);
-    }
-
-    private boolean containsPriorityItem(ItemStack @NotNull [] contents) {
-
-        List<Material> priority = configManager.getAutoCollectPriorityItems();
-
-        if (priority.isEmpty()) {
-            return false;
-        }
-
-        for (ItemStack item : contents) {
-
-            if (item != null && priority.contains(item.getType())) {
-                return true;
-            }
-
-        }
-
-        return false;
-
-    }
-
-    private boolean hasMergeRoom(@NotNull BoxCollectTarget target, @NotNull ItemStack stack) {
-
-        for (ItemStack slot : contentsOf(target)) {
-
-            if (slot != null && slot.isSimilar(stack) && slot.getAmount() < slot.getMaxStackSize()) {
-                return true;
-            }
-
-        }
-
-        return false;
+        slots.add(slot);
 
     }
 

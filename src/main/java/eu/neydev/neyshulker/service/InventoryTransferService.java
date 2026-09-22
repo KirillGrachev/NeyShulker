@@ -1,7 +1,6 @@
 package eu.neydev.neyshulker.service;
 
 import eu.neydev.neyshulker.util.ItemStackTransaction;
-import eu.neydev.neyshulker.util.ShulkerUtil;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;

@@ -120,7 +120,7 @@ public class ShulkerPersistenceService {
 
         } catch (RuntimeException exception) {
 
-            plugin.getLogger().severe("Ошибка сохранения шалкер-бокса игрока "
+            plugin.getLogger().severe("Failed to save the shulker box of player "
                     + player.getName() + ": " + exception.getMessage());
             return false;
 
@@ -133,18 +133,17 @@ public class ShulkerPersistenceService {
     }
 
     /**
-     * Помечает сессию измененной и планирует сохранение на следующий тик.
+     * Планирует сохранение сессии на следующий тик.
      * Повторные вызовы в пределах одного тика схлопываются в одно сохранение.
      *
-     * @param session изменяемая сессия
+     * @param session сохраняемая сессия
      */
-    public void markAndSchedule(@Nullable ShulkerSession session) {
+    public void scheduleSave(@Nullable ShulkerSession session) {
 
         if (session == null) {
             return;
         }
 
-        session.markModified();
         schedule(session, 1L);
 
     }

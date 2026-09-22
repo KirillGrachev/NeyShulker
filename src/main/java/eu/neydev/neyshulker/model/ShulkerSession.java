@@ -11,7 +11,6 @@ import org.jetbrains.annotations.Nullable;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.atomic.AtomicLong;
 
 /**
  * Сессия открытого шалкер-бокса.
@@ -23,7 +22,6 @@ import java.util.concurrent.atomic.AtomicLong;
  * @param inventory     GUI-инвентарь сессии
  * @param openedAt      время открытия в миллисекундах
  * @param slot          слот инвентаря, в котором лежит шалкер-бокс
- * @param modified      счетчик изменений содержимого
  * @param saving        флаг выполняющегося сохранения (защита от повторного входа)
  * @param saveScheduled флаг запланированного сохранения
  * @param detached      сессия откреплена: бокс покинул слот, записи больше не будет
@@ -35,7 +33,6 @@ public record ShulkerSession(
         @NotNull Inventory inventory,
         long openedAt,
         @NotNull AtomicInteger slot,
-        @NotNull AtomicLong modified,
         @NotNull AtomicBoolean saving,
         @NotNull AtomicBoolean saveScheduled,
         @NotNull AtomicBoolean detached
@@ -65,7 +62,6 @@ public record ShulkerSession(
                 inventoryFactory.get(),
                 System.currentTimeMillis(),
                 new AtomicInteger(slot),
-                new AtomicLong(0L),
                 new AtomicBoolean(false),
                 new AtomicBoolean(false),
                 new AtomicBoolean(false)
@@ -79,17 +75,6 @@ public record ShulkerSession(
 
     public void setSlot(int newSlot) {
         slot.set(newSlot);
-    }
-
-    /**
-     * Фиксирует изменение содержимого и возвращает новую версию.
-     */
-    public long markModified() {
-        return modified.incrementAndGet();
-    }
-
-    public long getModificationStamp() {
-        return modified.get();
     }
 
     /**

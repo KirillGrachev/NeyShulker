@@ -7,18 +7,18 @@ import org.bukkit.inventory.InventoryHolder;
 import org.jetbrains.annotations.NotNull;
 
 /**
- * Держатель GUI-инвентаря шалкер-бокса.
+ * Вьюер шалкер-бокса: держатель GUI-инвентаря открытой сессии.
  *
  * Единственная задача - быть маркером: по holder'у любой слушатель однозначно
  * отличает наш инвентарь от сундука, воронки или инвентаря другого плагина.
  * Сама сессия хранится в SessionRegistry и ищется по инвентарю,
  * поэтому здесь нет ссылок на изменяемое состояние.
  */
-public class ShulkerInventoryHolder implements InventoryHolder {
+public class NeyShulkerViewer implements InventoryHolder {
 
     private final Inventory inventory;
 
-    public ShulkerInventoryHolder(@NotNull String title) {
+    public NeyShulkerViewer(@NotNull String title) {
         this.inventory = Bukkit.createInventory(this, ShulkerUtil.SHULKER_SIZE, title);
     }
 

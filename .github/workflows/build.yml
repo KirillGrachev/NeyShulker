@@ -57,31 +57,3 @@ jobs:
         with:
           name: jacoco-report
           path: target/site/jacoco/
-
-  release:
-    name: GitHub release on tag
-    if: startsWith(github.ref, 'refs/tags/v')
-    needs: build
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Set up JDK 21
-        uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: 21
-          cache: maven
-
-      - name: Build and test
-        run: mvn -B -ntp verify
-
-      - name: Publish release with jar
-        uses: softprops/action-gh-release@v2
-        with:
-          files: target/NeyShulker-*.jar
-          generate_release_notes: true

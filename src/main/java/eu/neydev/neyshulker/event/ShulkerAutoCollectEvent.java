@@ -39,10 +39,6 @@ public class ShulkerAutoCollectEvent extends NeyShulkerEvent implements Cancella
         return item;
     }
 
-    public @NotNull ItemStack getItemStack() {
-        return item.getItemStack();
-    }
-
     public @NotNull ItemStack getTargetShulker() {
         return targetShulker.clone();
     }

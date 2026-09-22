@@ -8,6 +8,7 @@ import eu.neydev.neyshulker.config.type.PermissionNode;
 import eu.neydev.neyshulker.config.type.SoundKey;
 import eu.neydev.neyshulker.config.type.SoundSettings;
 import eu.neydev.neyshulker.config.type.CollectMode;
+import eu.neydev.neyshulker.config.type.FillOrderType;
 import eu.neydev.neyshulker.config.type.TitleMode;
 import eu.neydev.neyshulker.service.ConsoleService;
 import eu.neydev.neyshulker.util.HexColorUtil;
@@ -19,6 +20,8 @@ import org.jetbrains.annotations.Nullable;
 
 import java.io.File;
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Locale;
 import java.util.Collections;
 import java.util.EnumMap;
 import java.util.EnumSet;
@@ -52,8 +55,11 @@ public class ConfigManager implements NeyShulkerConfig {
     private static final String PATH_TITLE_MODE = "settings.shulker.title.mode";
     private static final String PATH_TITLE_FORMAT = "settings.shulker.title.format";
     private static final String PATH_SAVE_INTERVAL = "settings.shulker.save_interval";
-    private static final String PATH_BLACKLIST_ENABLED = "settings.shulker.blacklist.enabled";
-    private static final String PATH_BLACKLIST_ITEMS = "settings.shulker.blacklist.items";
+    private static final String PATH_TITLE_NAMES = "settings.shulker.title.names";
+    private static final String PATH_BLOCKED_ITEMS_ENABLED = "settings.shulker.blocked_items.enabled";
+    private static final String PATH_BLOCKED_ITEMS = "settings.shulker.blocked_items.items";
+    private static final String PATH_LEGACY_BLACKLIST_ENABLED = "settings.shulker.blacklist.enabled";
+    private static final String PATH_LEGACY_BLACKLIST_ITEMS = "settings.shulker.blacklist.items";
 
 
     private static final String PATH_AUTO_COLLECT_ENABLED = "settings.auto_collect.enabled";
@@ -67,9 +73,10 @@ public class ConfigManager implements NeyShulkerConfig {
     private static final String PATH_AUTO_COLLECT_MODE = "settings.auto_collect.mode";
     private static final String PATH_AUTO_COLLECT_IGNORE_DELAY = "settings.auto_collect.rules.ignore_pickup_delay";
     private static final String PATH_AUTO_COLLECT_PERMISSION = "settings.auto_collect.permission.required";
-    private static final String PATH_AUTO_COLLECT_MESSAGES = "settings.auto_collect.feedback.messages";
+    private static final String PATH_AUTO_COLLECT_FILL_ORDER = "settings.auto_collect.rules.fill_order";
     private static final String PATH_AUTO_COLLECT_PRIORITY = "settings.auto_collect.priority_items";
-    private static final String PATH_AUTO_COLLECT_BLACKLIST = "settings.auto_collect.blacklist";
+    private static final String PATH_AUTO_COLLECT_IGNORED = "settings.auto_collect.ignored_items";
+    private static final String PATH_LEGACY_AUTO_COLLECT_BLACKLIST = "settings.auto_collect.blacklist";
 
 
     private static final String PATH_MESSAGES_ENABLED = "messages.enabled";
@@ -105,6 +112,7 @@ public class ConfigManager implements NeyShulkerConfig {
     private OpenMethodType openMethod;
     private TitleMode titleMode;
     private String titleFormat;
+    private Map<String, String> titleNames;
     private int saveInterval;
     private boolean blacklistEnabled;
     private Set<Material> blacklistedMaterials;
@@ -120,7 +128,7 @@ public class ConfigManager implements NeyShulkerConfig {
     private boolean autoCollectMergeIntoExisting;
     private CollectMode autoCollectMode;
     private boolean autoCollectIgnorePickupDelay;
-    private boolean autoCollectMessages;
+    private FillOrderType autoCollectFillOrder;
     private List<Material> autoCollectPriorityItems;
     private Set<Material> autoCollectBlacklist;
 
@@ -265,8 +273,13 @@ public class ConfigManager implements NeyShulkerConfig {
     }
 
     @Override
-    public boolean areAutoCollectMessagesEnabled() {
-        return autoCollectMessages;
+    public FillOrderType getAutoCollectFillOrder() {
+        return autoCollectFillOrder;
+    }
+
+    @Override
+    public Map<String, String> getTitleNames() {
+        return titleNames;
     }
 
     @Override
@@ -366,8 +379,9 @@ public class ConfigManager implements NeyShulkerConfig {
         titleFormat = color(readTitleFormat());
         saveInterval = intOrWarn(config.getInt(PATH_SAVE_INTERVAL, 10),
                 PATH_SAVE_INTERVAL, MIN_INTERVAL_TICKS);
-        blacklistEnabled = config.getBoolean(PATH_BLACKLIST_ENABLED, true);
-        blacklistedMaterials = readMaterials(PATH_BLACKLIST_ITEMS, DEFAULT_BLACKLIST);
+        titleNames = readTitleNames();
+        blacklistEnabled = readBoolean(PATH_BLOCKED_ITEMS_ENABLED, PATH_LEGACY_BLACKLIST_ENABLED, true);
+        blacklistedMaterials = readMaterials(PATH_BLOCKED_ITEMS, PATH_LEGACY_BLACKLIST_ITEMS, DEFAULT_BLACKLIST);
 
     }
 
@@ -389,8 +403,9 @@ public class ConfigManager implements NeyShulkerConfig {
         autoCollectMergeIntoExisting = config.getBoolean(PATH_AUTO_COLLECT_MERGE, true);
         autoCollectMode = parseCollectMode();
         autoCollectIgnorePickupDelay = config.getBoolean(PATH_AUTO_COLLECT_IGNORE_DELAY, false);
-        autoCollectMessages = config.getBoolean(PATH_AUTO_COLLECT_MESSAGES, false);
-        autoCollectBlacklist = readMaterials(PATH_AUTO_COLLECT_BLACKLIST, DEFAULT_AUTO_COLLECT_BLACKLIST);
+        autoCollectFillOrder = parseFillOrder();
+        autoCollectBlacklist = readMaterials(PATH_AUTO_COLLECT_IGNORED,
+                PATH_LEGACY_AUTO_COLLECT_BLACKLIST, DEFAULT_AUTO_COLLECT_BLACKLIST);
         autoCollectPriorityItems = readMaterialList(PATH_AUTO_COLLECT_PRIORITY, DEFAULT_PRIORITY_ITEMS);
 
     }
@@ -405,7 +420,7 @@ public class ConfigManager implements NeyShulkerConfig {
 
             String path = "messages." + key.getConfigKey();
 
-            if (!config.getBoolean(path + ".enabled", true)) {
+            if (!config.getBoolean(path + ".enabled", key.isDefaultEnabled())) {
                 messages.put(key, List.of());
                 continue;
             }
@@ -441,11 +456,6 @@ public class ConfigManager implements NeyShulkerConfig {
 
 
     /**
-     * Читает режим досортировки инвентаря; при некорректном значении - MATCHING.
-     *
-     * @return режим источника "инвентарь"
-     */
-    /**
      * Читает глобальный режим автосбора; при некорректном значении - ALL.
      *
      * @return режим обоих источников сбора
@@ -465,6 +475,88 @@ public class ConfigManager implements NeyShulkerConfig {
                 "defaultValue", CollectMode.ALL.name());
 
         return CollectMode.ALL;
+
+    }
+
+    /**
+     * Читает стратегию выбора бокса на нижнем ярусе подбора цели;
+     * при некорректном значении - BALANCED.
+     *
+     * @return стратегию распределения дропа по боксам
+     */
+    private @NotNull FillOrderType parseFillOrder() {
+
+        String configValue = config.getString(PATH_AUTO_COLLECT_FILL_ORDER, FillOrderType.BALANCED.name());
+        FillOrderType parsed = FillOrderType.fromString(configValue, null);
+
+        if (parsed != null) {
+            return parsed;
+        }
+
+        consoleService.log(ConsoleMessage.INVALID_VALUE,
+                "path", PATH_AUTO_COLLECT_FILL_ORDER,
+                "value", configValue,
+                "defaultValue", FillOrderType.BALANCED.name());
+
+        return FillOrderType.BALANCED;
+
+    }
+
+    /**
+     * Читает имена безымянного шалкер-бокса по языкам клиента.
+     * Ключи приводятся к нижнему регистру, значения получают цвета сразу.
+     *
+     * @return карту locale -> имя (пустую, если секции нет)
+     */
+    private @NotNull Map<String, String> readTitleNames() {
+
+        Object raw = config.get(PATH_TITLE_NAMES);
+
+        if (!(raw instanceof org.bukkit.configuration.ConfigurationSection section)) {
+            return Map.of();
+        }
+
+        Map<String, String> names = new HashMap<>();
+
+        for (String key : section.getKeys(false)) {
+
+            String name = section.getString(key);
+
+            if (name != null && !name.isBlank()) {
+                names.put(key.toLowerCase(Locale.ROOT), color(name));
+            }
+
+        }
+
+        return Collections.unmodifiableMap(names);
+
+    }
+
+    /**
+     * Читает булев флаг с legacy-путем как запасным: старые конфигурации
+     * продолжают работать, а в консоль уходит предупреждение о переименовании.
+     *
+     * @param path        актуальный путь
+     * @param legacyPath  устаревший путь
+     * @param defaultValue значение по умолчанию
+     * @return значение флага
+     */
+    private boolean readBoolean(@NotNull String path, @NotNull String legacyPath, boolean defaultValue) {
+
+        if (config.isSet(path)) {
+            return config.getBoolean(path, defaultValue);
+        }
+
+        if (config.isSet(legacyPath)) {
+
+            consoleService.log(ConsoleMessage.LEGACY_PATH,
+                    "path", legacyPath,
+                    "replacement", path);
+
+            return config.getBoolean(legacyPath, defaultValue);
+        }
+
+        return defaultValue;
 
     }
 
@@ -623,9 +715,23 @@ public class ConfigManager implements NeyShulkerConfig {
 
     }
 
-    private @NotNull Set<Material> readMaterials(String path, Set<Material> defaults) {
+    private @NotNull Set<Material> readMaterials(String path,
+                                                  String legacyPath,
+                                                  Set<Material> defaults) {
 
         List<String> names = config.getStringList(path);
+        String sourcePath = path;
+
+        if (names.isEmpty() && config.isSet(legacyPath)) {
+
+            names = config.getStringList(legacyPath);
+            sourcePath = legacyPath;
+
+            consoleService.log(ConsoleMessage.LEGACY_PATH,
+                    "path", legacyPath,
+                    "replacement", path);
+
+        }
 
         if (names.isEmpty()) {
             return EnumSet.copyOf(defaults);
@@ -635,7 +741,7 @@ public class ConfigManager implements NeyShulkerConfig {
 
         for (String name : names) {
 
-            Material material = readMaterial(name, path);
+            Material material = readMaterial(name, sourcePath);
 
             if (material != null) {
                 materials.add(material);

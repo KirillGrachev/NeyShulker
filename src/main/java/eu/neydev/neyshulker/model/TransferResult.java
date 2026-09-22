@@ -16,8 +16,4 @@ public record TransferResult(
         @Nullable ItemStack destination,
         int transferred
 ) {
-
-    private static @Nullable ItemStack clone(@Nullable ItemStack itemStack) {
-        return itemStack == null ? null : itemStack.clone();
-    }
 }
