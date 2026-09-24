@@ -4,6 +4,7 @@ import eu.neydev.neyshulker.NeyShulker;
 import eu.neydev.neyshulker.config.ConfigManager;
 import eu.neydev.neyshulker.config.type.CollectMode;
 import eu.neydev.neyshulker.registry.SessionRegistry;
+import eu.neydev.neyshulker.service.collect.PlayerDropTracker;
 import eu.neydev.neyshulker.util.FakeItemStack;
 import eu.neydev.neyshulker.util.ShulkerUtil;
 import eu.neydev.neyshulker.util.TestInventories;
@@ -51,6 +52,7 @@ class AutoCollectWaitListSyncTest {
     private final MessageService messageService = mock(MessageService.class);
     private final SoundService soundService = mock(SoundService.class);
     private final PermissionService permissionService = mock(PermissionService.class);
+    private final PlayerDropTracker dropTracker = new PlayerDropTracker(() -> 0L);
     private final PluginManager pluginManager = mock(PluginManager.class);
 
     /**
@@ -168,13 +170,14 @@ class AutoCollectWaitListSyncTest {
         when(configManager.getPlayersPerWave()).thenReturn(5);
         when(configManager.getActionsPerWave()).thenReturn(actionsPerWave);
         when(configManager.getQueuePerPlayer()).thenReturn(32);
+        when(configManager.getFullMessageCooldown()).thenReturn(30);
         when(configManager.isAutoCollectBlacklisted(any())).thenReturn(false);
         when(configManager.isBlacklistEnabled()).thenReturn(false);
         when(configManager.getAutoCollectPriorityItems()).thenReturn(List.of());
 
         return new AutoCollectService(plugin, configManager, sessionRegistry,
                 new InventoryTransferService(), persistenceService,
-                messageService, soundService, permissionService);
+                messageService, soundService, permissionService, dropTracker);
 
     }
 
@@ -200,7 +203,7 @@ class AutoCollectWaitListSyncTest {
 
         AutoCollectService service = service(0);
 
-        try (MockedStatic<Bukkit> bukkit = bukkit(fixture)) {
+        try (MockedStatic<Bukkit> ignored = bukkit(fixture)) {
 
             service.wave();
 
@@ -229,7 +232,7 @@ class AutoCollectWaitListSyncTest {
 
         AutoCollectService service = service(0);
 
-        try (MockedStatic<Bukkit> bukkit = bukkit(fixture)) {
+        try (MockedStatic<Bukkit> ignored = bukkit(fixture)) {
 
             service.wave();
 
@@ -268,7 +271,7 @@ class AutoCollectWaitListSyncTest {
 
         AutoCollectService service = service(0);
 
-        try (MockedStatic<Bukkit> bukkit = bukkit(fixture)) {
+        try (MockedStatic<Bukkit> ignored = bukkit(fixture)) {
 
             service.wave();
 
@@ -300,7 +303,7 @@ class AutoCollectWaitListSyncTest {
 
         AutoCollectService service = service(0);
 
-        try (MockedStatic<Bukkit> bukkit = bukkit(fixture)) {
+        try (MockedStatic<Bukkit> ignored = bukkit(fixture)) {
 
             service.wave();
 
@@ -333,7 +336,7 @@ class AutoCollectWaitListSyncTest {
 
         AutoCollectService service = service(0);
 
-        try (MockedStatic<Bukkit> bukkit = bukkit(fixture)) {
+        try (MockedStatic<Bukkit> ignored = bukkit(fixture)) {
 
             service.wave();
 
@@ -357,7 +360,7 @@ class AutoCollectWaitListSyncTest {
 
         AutoCollectService service = service(0);
 
-        try (MockedStatic<Bukkit> bukkit = bukkit(fixture)) {
+        try (MockedStatic<Bukkit> ignored = bukkit(fixture)) {
 
             service.wave();
 

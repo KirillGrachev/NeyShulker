@@ -52,6 +52,9 @@ settings:
       #            whole inventory into the boxes
       # MATCHING - only types already present in a box or in the open GUI;
       #            an empty box stays idle until filled by hand
+    full_message_cooldown: 30 # Seconds between repeated "the box is full" notices
+      # per player; a mass drop (a creeper explosion on a full box) stays a
+      # single line in the chat instead of a message per wave
 
     scan:
       distance: 4.5 # Pickup radius in blocks; mining reach is ~4.5, so a smaller
@@ -71,6 +74,12 @@ settings:
       # drops of types it already holds, merging into partial stacks
       ignore_pickup_delay: false # true - also collect items that still have a
       # pickup delay (fresh drops wait ~0.5s before the auto-collect may touch them)
+      ignore_player_dropped: true # true - items a player threw are never collected
+      # (the throw is remembered, plus the vanilla owner flag as a fallback):
+      # trading by throwing and deliberate drops stay between the players
+      respect_nearby_players: 4.5 # Skip a drop when another player stands within
+      # this many blocks of it (0 disables): on spawn or at someone's farm the loot
+      # counts as theirs; solo farming is unaffected
       # Target box for a drop when several boxes qualify, top tier first:
       #   1 - a box with a partial stack of the drop type (merge_into_existing),
       #       the stack with the most room left absorbs the drop
@@ -170,7 +179,6 @@ messages:
     text:
       - "{prefix}&7No open shulker boxes."
       - "&7Auto-collect: {state}"
-      - "&7Transfer queue: &f{queue}"
 
   info_session:
     enabled: true

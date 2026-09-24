@@ -4,6 +4,7 @@ import eu.neydev.neyshulker.config.ConfigManager;
 import eu.neydev.neyshulker.service.ConsoleService;
 import eu.neydev.neyshulker.registry.SessionRegistry;
 import eu.neydev.neyshulker.service.AutoCollectService;
+import eu.neydev.neyshulker.service.collect.PlayerDropTracker;
 import eu.neydev.neyshulker.service.InventoryTransferService;
 import eu.neydev.neyshulker.service.MessageService;
 import eu.neydev.neyshulker.service.PermissionService;
@@ -38,6 +39,7 @@ public final class ServiceContainer {
     private final ShulkerOpenService openService;
     private final ShulkerCloseService closeService;
     private final ShulkerTransferService transferService;
+    private final PlayerDropTracker dropTracker;
     private final AutoCollectService autoCollectService;
 
     public ServiceContainer(NeyShulker plugin, ConfigManager configManager,
@@ -70,9 +72,10 @@ public final class ServiceContainer {
         this.transferService = new ShulkerTransferService(sessionRegistry, persistenceService);
 
         // Фоновые задачи
+        this.dropTracker = new PlayerDropTracker(System::currentTimeMillis);
         this.autoCollectService = new AutoCollectService(plugin, configManager, sessionRegistry,
                 inventoryTransferService, persistenceService, messageService, soundService,
-                permissionService);
+                permissionService, dropTracker);
 
     }
 
@@ -138,5 +141,9 @@ public final class ServiceContainer {
 
     public AutoCollectService getAutoCollectService() {
         return autoCollectService;
+    }
+
+    public PlayerDropTracker getDropTracker() {
+        return dropTracker;
     }
 }

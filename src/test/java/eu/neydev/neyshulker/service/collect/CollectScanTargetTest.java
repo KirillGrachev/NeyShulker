@@ -3,6 +3,7 @@ package eu.neydev.neyshulker.service.collect;
 import eu.neydev.neyshulker.config.ConfigManager;
 import eu.neydev.neyshulker.config.type.CollectMode;
 import eu.neydev.neyshulker.config.type.FillOrderType;
+import eu.neydev.neyshulker.model.ShulkerSession;
 import eu.neydev.neyshulker.service.InventoryTransferService;
 import eu.neydev.neyshulker.service.ShulkerPersistenceService;
 import eu.neydev.neyshulker.util.FakeItemStack;
@@ -18,8 +19,14 @@ import org.bukkit.inventory.meta.BlockStateMeta;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
+import java.util.UUID;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
+
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -107,7 +114,6 @@ class CollectScanTargetTest {
     private int targetSlot(CollectScan scan, Material material) {
 
         CollectTarget target = scan.targetFor(new FakeItemStack(material, 1));
-
         return target == null ? -1 : ((BoxCollectTarget) target).getSlot();
 
     }
@@ -209,6 +215,104 @@ class CollectScanTargetTest {
         assertEquals(0, targetSlot(scan, Material.DIRT));
         assertEquals(-1, targetSlot(scan, Material.GOLD_INGOT));
         assertNull(scan.targetFor(new FakeItemStack(Material.GOLD_INGOT, 1)));
+
+    }
+
+    @Test
+    @DisplayName("hasSpaceFor: место - свободный слот или частичный стек того же типа")
+    void hasSpaceForSeesPhysicalSpace() {
+
+        defaultRules();
+
+        CollectScan full = scan(box(0, partials(27)));
+
+        assertFalse(full.hasSpaceFor(new FakeItemStack(Material.DIAMOND, 1)),
+                "Свободных слотов нет, мерджиться алмазу некуда");
+        assertTrue(full.hasSpaceFor(new FakeItemStack(Material.COBBLESTONE, 1)),
+                "Частичный стек того же типа поглощает дроп и без свободного слота");
+
+        CollectScan matching = scan(box(0, new FakeItemStack(Material.DIRT, 64)));
+
+        when(configManager.getAutoCollectMode()).thenReturn(CollectMode.MATCHING);
+
+        assertNull(matching.targetFor(new FakeItemStack(Material.GOLD_INGOT, 1)));
+        assertTrue(matching.hasSpaceFor(new FakeItemStack(Material.GOLD_INGOT, 1)),
+                "Отказ по гейту режима - не нехватка места");
+
+    }
+
+    @Test
+    @DisplayName("MATCHING: незнакомый сессии тип уходит на ярусы боксов")
+    void matchingSessionFallsThroughToBoxes() {
+
+        defaultRules();
+        when(configManager.getAutoCollectMode()).thenReturn(CollectMode.MATCHING);
+
+        Inventory session = TestInventories.inventory(ShulkerUtil.SHULKER_SIZE);
+        session.setItem(0, new FakeItemStack(Material.DIRT, 64));
+
+        CollectScan scan = scanWithSession(session,
+                box(0, new FakeItemStack(Material.COBBLESTONE, 1)));
+
+        assertEquals(0, targetSlot(scan, Material.COBBLESTONE),
+                "Сессия не хранит булыжник - цель выбирают ярусы боксов");
+        assertFalse(scan.targetFor(new FakeItemStack(Material.DIRT, 1)) instanceof BoxCollectTarget,
+                "Тип есть в сессии: открытое GUI приоритетнее боксов");
+
+        when(configManager.getAutoCollectMode()).thenReturn(CollectMode.ALL);
+
+        assertFalse(scan.targetFor(new FakeItemStack(Material.COBBLESTONE, 1)) instanceof BoxCollectTarget,
+                "В ALL сессия принимает любой тип раньше боксов");
+
+    }
+
+    @Test
+    @DisplayName("hasSpaceFor с открытым GUI: полная сессия места не обещает")
+    void sessionSpaceGate() {
+
+        defaultRules();
+
+        Inventory session = TestInventories.inventory(ShulkerUtil.SHULKER_SIZE);
+
+        for (int i = 0; i < ShulkerUtil.SHULKER_SIZE; i++) {
+            session.setItem(i, new FakeItemStack(Material.DIRT, 64));
+        }
+
+        CollectScan scan = scanWithSession(session);
+
+        assertFalse(scan.hasSpaceFor(new FakeItemStack(Material.DIAMOND, 1)),
+                "Полная сессия: ни свободного слота, ни частичного стека");
+
+        session.setItem(5, null);
+
+        assertTrue(scan.hasSpaceFor(new FakeItemStack(Material.DIAMOND, 1)),
+                "Появился свободный слот - место есть");
+
+    }
+
+    /**
+     * Скан с открытым GUI: сессия строится поверх тех же боксов инвентаря.
+     */
+    private CollectScan scanWithSession(Inventory sessionInventory, ItemStack... boxesBySlot) {
+
+        Player player = mock(Player.class);
+        PlayerInventory inventory = TestInventories.playerInventory();
+
+        ItemStack[] contents = new ItemStack[41];
+
+        for (ItemStack box : boxesBySlot) {
+            contents[slotOf(box)] = box;
+        }
+
+        when(inventory.getContents()).thenReturn(contents);
+        when(player.getInventory()).thenReturn(inventory);
+
+        ShulkerSession session = new ShulkerSession(UUID.randomUUID(), UUID.randomUUID(),
+                new FakeItemStack(Material.WHITE_SHULKER_BOX, 1), sessionInventory,
+                System.currentTimeMillis(), new AtomicInteger(0),
+                new AtomicBoolean(), new AtomicBoolean(), new AtomicBoolean());
+
+        return new CollectScan(player, session, configManager, transferService, persistenceService);
 
     }
 

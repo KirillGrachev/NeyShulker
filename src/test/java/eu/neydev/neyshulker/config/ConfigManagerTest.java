@@ -14,7 +14,6 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
-import java.io.File;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -133,6 +132,7 @@ class ConfigManagerTest {
                       players_per_wave: 3
                       actions_per_wave: 7
                       queue_per_player: 9
+                    full_message_cooldown: 12
                     permission:
                       required: true
                     priority_items:
@@ -166,6 +166,7 @@ class ConfigManagerTest {
         assertEquals(3, config.getPlayersPerWave());
         assertEquals(7, config.getActionsPerWave());
         assertEquals(9, config.getQueuePerPlayer());
+        assertEquals(12, config.getFullMessageCooldown());
         assertEquals(5.5D, config.getAutoCollectMaxDistance());
         assertEquals(java.util.List.of(Material.EMERALD), config.getAutoCollectPriorityItems());
 
@@ -185,6 +186,29 @@ class ConfigManagerTest {
 
         assertTrue(config.arePermissionsEnabled());
         assertEquals("custom.use", config.getPermission(PermissionNode.USE));
+
+    }
+
+    @Test
+    @DisplayName("legacy-строка info_idle с {queue} исключается из сообщения")
+    void legacyQueueLineDroppedFromInfoIdle() throws Exception {
+
+        writeConfig("""
+                messages:
+                  info_idle:
+                    enabled: true
+                    text:
+                      - "{prefix}&7No open shulker boxes."
+                      - "&7Auto-collect: {state}"
+                      - "&7Transfer queue: &f{queue}"
+                """);
+
+        ConfigManager config = configManager(plugin());
+
+        List<String> lines = config.getMessages(MessageKey.INFO_IDLE);
+
+        assertEquals(2, lines.size(), "Очередь - техническая деталь волн, в чате ее больше нет");
+        assertTrue(lines.stream().noneMatch(line -> line.contains("{queue}")));
 
     }
 

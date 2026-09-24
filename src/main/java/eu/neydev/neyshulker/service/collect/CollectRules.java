@@ -5,11 +5,15 @@ import eu.neydev.neyshulker.config.type.PermissionNode;
 import eu.neydev.neyshulker.service.PermissionService;
 import eu.neydev.neyshulker.util.ShulkerUtil;
 import org.bukkit.GameMode;
+import org.bukkit.Location;
 import org.bukkit.Material;
+import org.bukkit.entity.Item;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+
+import java.util.UUID;
 
 /**
  * Правила допуска автосбора: гейты игрока и допустимость предметов.
@@ -19,13 +23,68 @@ public final class CollectRules {
 
     private final ConfigManager configManager;
     private final PermissionService permissionService;
+    private final PlayerDropTracker dropTracker;
 
     public CollectRules(@NotNull ConfigManager configManager,
-                        @NotNull PermissionService permissionService) {
+                        @NotNull PermissionService permissionService,
+                        @NotNull PlayerDropTracker dropTracker) {
 
         this.configManager = configManager;
         this.permissionService = permissionService;
+        this.dropTracker = dropTracker;
 
+    }
+
+    /**
+     * Проверяет: считается ли дроп спорным, то есть чужим.
+     *
+     * Спорный предмет не всасывается: выброшенные игроком вещи трогать нельзя
+     * (передача или намеренный сброс), а лут, у которого стоит другой игрок,
+     * считается его добычей (спавн, чужая ферма).
+     *
+     * @param collector собирающий игрок
+     * @param item      дроп на земле
+     * @return true, если дроп надо пропустить
+     */
+    public boolean isContested(@NotNull Player collector, @NotNull Item item) {
+
+        if (configManager.isAutoCollectIgnorePlayerDropped() && isPlayerThrown(item)) {
+            return true;
+        }
+
+        double radius = configManager.getAutoCollectRespectNearbyPlayers();
+
+        if (radius <= 0D) {
+            return false;
+        }
+
+        Location at = item.getLocation();
+
+        for (Player other : collector.getWorld().getPlayers()) {
+
+            if (other == collector || !other.isOnline()) {
+                continue;
+            }
+
+            if (other.getLocation().distanceSquared(at) <= radius * radius) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Проверяет: выброшен ли предмет игроком (памятка или ванильный флаг владельца).
+     */
+    private boolean isPlayerThrown(@NotNull Item item) {
+
+        if (dropTracker.isPlayerDropped(item)) {
+            return true;
+        }
+
+        UUID owner = item.getOwner();
+        return owner != null;
     }
 
     /**

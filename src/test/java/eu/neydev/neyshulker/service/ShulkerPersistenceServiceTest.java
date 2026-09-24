@@ -2,8 +2,6 @@ package eu.neydev.neyshulker.service;
 
 import eu.neydev.neyshulker.NeyShulker;
 import eu.neydev.neyshulker.config.ConfigManager;
-import eu.neydev.neyshulker.config.type.ConsoleMessage;
-import eu.neydev.neyshulker.service.ConsoleService;
 import eu.neydev.neyshulker.model.ShulkerSession;
 import eu.neydev.neyshulker.registry.SessionRegistry;
 import eu.neydev.neyshulker.util.TestInventories;
@@ -18,20 +16,16 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.MockedStatic;
 
-import java.util.List;
 import java.util.UUID;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
-import static org.mockito.ArgumentMatchers.eq;
 
 /**
  * Проверка записи содержимого и поведения открепленной сессии.

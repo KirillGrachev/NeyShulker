@@ -55,7 +55,6 @@ public class InventoryTransferService {
     public int insertInto(ItemStack @NotNull [] slots, @NotNull ItemStack item) {
 
         ItemStack rest = ItemStackTransaction.insert(slots, item.clone(), slots.length);
-
         return item.getAmount() - (rest == null ? 0 : rest.getAmount());
 
     }

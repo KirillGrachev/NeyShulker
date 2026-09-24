@@ -37,7 +37,6 @@ public final class BoxCollectTarget implements CollectTarget {
     public @NotNull ItemStack shulkerItem() {
 
         ItemStack box = player.getInventory().getItem(slot);
-
         return box == null ? new ItemStack(Material.AIR) : box;
 
     }

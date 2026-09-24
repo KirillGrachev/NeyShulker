@@ -9,6 +9,7 @@ import eu.neydev.neyshulker.listener.PlayerInteractListener;
 import eu.neydev.neyshulker.listener.ShulkerCleanupListener;
 import eu.neydev.neyshulker.listener.ShulkerGuardListener;
 import eu.neydev.neyshulker.listener.ShulkerSyncListener;
+import eu.neydev.neyshulker.listener.PlayerDropListener;
 import eu.neydev.neyshulker.listener.WaitListSyncListener;
 import eu.neydev.neyshulker.placeholder.NeyShulkerExpansion;
 import org.bukkit.plugin.java.JavaPlugin;
@@ -38,7 +39,8 @@ public final class NeyShulker extends JavaPlugin {
                 new ShulkerGuardListener(this),
                 new ShulkerSyncListener(this),
                 new ShulkerCleanupListener(this),
-                new WaitListSyncListener(this)
+                new WaitListSyncListener(this),
+                new PlayerDropListener(this)
         );
 
         this.commandDispatcher = new CommandDispatcher(this, consoleService);

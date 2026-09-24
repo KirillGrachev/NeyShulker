@@ -122,7 +122,6 @@ public class ShulkerValidationService {
         }
 
         ShulkerSession session = sessionRegistry.getSession(player);
-
         return session != null && item.isSimilar(session.shulkerItem());
 
     }
@@ -152,6 +151,36 @@ public class ShulkerValidationService {
         }
 
         return ShulkerUtil.isShulkerBox(inventory.getItem(session.getSlot()));
+
+    }
+
+    /**
+     * Проверяет, является ли выброшенный предмет самим открытым боксом.
+     *
+     * Сравнение идет с живым стеком слота сессии, а не со слепком открытия:
+     * автосохранения перезаписывают мету, и слепок переставал узнавать бокс.
+     * Ваниль не может выбросить бокс мимо кликовых проверок (слот заблокирован
+     * на уровне InventoryClickEvent), поэтому сюда доходят только выбросы
+     * чужими путями - командами и сторонними плагинами.
+     *
+     * @param player игрок
+     * @param item   выброшенный предмет
+     * @return true если это тот самый открытый шалкер-бокс
+     */
+    public boolean isDroppedOpenShulker(@NotNull Player player, @Nullable ItemStack item) {
+
+        if (!ShulkerUtil.isShulkerBox(item)) {
+            return false;
+        }
+
+        ShulkerSession session = sessionRegistry.getSession(player);
+
+        if (session == null) {
+            return false;
+        }
+
+        ItemStack inSlot = player.getInventory().getItem(session.getSlot());
+        return ShulkerUtil.isShulkerBox(inSlot) && item.isSimilar(inSlot);
 
     }
 

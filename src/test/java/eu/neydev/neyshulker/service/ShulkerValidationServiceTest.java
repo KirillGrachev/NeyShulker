@@ -259,6 +259,44 @@ class ShulkerValidationServiceTest {
     }
 
     @Test
+    @DisplayName("Выброшенный открытый бокс узнается по живому стеку слота")
+    void detectsDroppedOpenShulkerByLiveSlotStack() {
+
+        PlayerInventory inventory = TestInventories.playerInventory();
+        ItemStack box = shulker();
+
+        when(player.getInventory()).thenReturn(inventory);
+        inventory.setItem(6, box);
+
+        ShulkerSession session = ShulkerSession.create(UUID.randomUUID(), player, box,
+                () -> inventory, 6);
+
+        when(sessionRegistry.getSession(player)).thenReturn(session);
+
+        assertTrue(validationService.isDroppedOpenShulker(player, box.clone()),
+                "Бокс узнается по живому стеку слота, а не по мете сессии");
+        assertFalse(validationService.isDroppedOpenShulker(player,
+                new FakeItemStack(Material.BLACK_SHULKER_BOX, 1)));
+        assertFalse(validationService.isDroppedOpenShulker(player, new FakeItemStack(Material.STONE, 1)));
+        assertFalse(validationService.isDroppedOpenShulker(player, null));
+
+        // Слот сессии пуст - значит бокс уже не там, защиту не включаем
+        inventory.setItem(6, null);
+        assertFalse(validationService.isDroppedOpenShulker(player, box.clone()));
+
+    }
+
+    @Test
+    @DisplayName("Без сессии выброшенный шалкер не считается открытым")
+    void droppedShulkerWithoutSessionIsNotOpen() {
+
+        when(sessionRegistry.getSession(player)).thenReturn(null);
+
+        assertFalse(validationService.isDroppedOpenShulker(player, shulker()));
+
+    }
+
+    @Test
     @DisplayName("Слот открытого шалкера заблокирован")
     void shulkerSlotIsLocked() {
 

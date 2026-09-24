@@ -11,6 +11,7 @@ import eu.neydev.neyshulker.service.collect.CollectRules;
 import eu.neydev.neyshulker.service.collect.CollectScan;
 import eu.neydev.neyshulker.service.collect.CollectTarget;
 import eu.neydev.neyshulker.service.collect.NearbyItemsFinder;
+import eu.neydev.neyshulker.service.collect.PlayerDropTracker;
 import eu.neydev.neyshulker.service.collect.PlayerWaitList;
 import eu.neydev.neyshulker.task.RepeatingTask;
 import eu.neydev.neyshulker.util.ShulkerUtil;
@@ -56,11 +57,13 @@ public class AutoCollectService {
     private final SoundService soundService;
 
     private final CollectRules rules;
+    private final PlayerDropTracker dropTracker;
     private final NearbyItemsFinder nearbyItemsFinder;
     private final RepeatingTask collectTask;
 
     private final Set<UUID> disabledPlayers = ConcurrentHashMap.newKeySet();
     private final Map<UUID, PlayerWaitList> waitLists = new ConcurrentHashMap<>();
+    private final Map<UUID, Long> fullNotices = new ConcurrentHashMap<>();
 
     private int rotationIndex;
 
@@ -71,7 +74,8 @@ public class AutoCollectService {
                               @NotNull ShulkerPersistenceService persistenceService,
                               @NotNull MessageService messageService,
                               @NotNull SoundService soundService,
-                              @NotNull PermissionService permissionService) {
+                              @NotNull PermissionService permissionService,
+                              @NotNull PlayerDropTracker dropTracker) {
 
         this.plugin = plugin;
         this.configManager = configManager;
@@ -80,8 +84,9 @@ public class AutoCollectService {
         this.persistenceService = persistenceService;
         this.messageService = messageService;
         this.soundService = soundService;
+        this.dropTracker = dropTracker;
 
-        this.rules = new CollectRules(configManager, permissionService);
+        this.rules = new CollectRules(configManager, permissionService, dropTracker);
         this.nearbyItemsFinder = new NearbyItemsFinder(configManager);
         this.collectTask = new RepeatingTask(plugin, "auto-collect", this::wave);
 
@@ -114,6 +119,8 @@ public class AutoCollectService {
 
         collectTask.stop();
         waitLists.clear();
+        fullNotices.clear();
+        dropTracker.clear();
 
     }
 
@@ -157,6 +164,7 @@ public class AutoCollectService {
 
         disabledPlayers.remove(player.getUniqueId());
         waitLists.remove(player.getUniqueId());
+        fullNotices.remove(player.getUniqueId());
 
     }
 
@@ -171,6 +179,8 @@ public class AutoCollectService {
      * Вызывается задачей по расписанию; публична для проверяемых тестов.
      */
     public void wave() {
+
+        dropTracker.purge();
 
         detectWave();
         drainWave();
@@ -235,6 +245,10 @@ public class AutoCollectService {
                 key -> new PlayerWaitList(configManager.getQueuePerPlayer()));
 
         for (Item item : nearbyItemsFinder.find(player)) {
+
+            if (rules.isContested(player, item)) {
+                continue;
+            }
 
             if (!waitList.offer(CollectEntry.ground(item))) {
                 break;
@@ -306,6 +320,7 @@ public class AutoCollectService {
 
             if (player == null) {
                 waitLists.remove(playerId);
+                fullNotices.remove(playerId);
                 continue;
             }
 
@@ -415,6 +430,11 @@ public class AutoCollectService {
             return DrainStep.delayed();
         }
 
+        // Спорный дроп (брошен игроком или у него стоит другой игрок) не всасываем
+        if (rules.isContested(player, item)) {
+            return DrainStep.none();
+        }
+
         ItemStack stack = item.getItemStack();
 
         if (ShulkerUtil.isEmpty(stack) || rules.isExcluded(player, stack)) {
@@ -425,9 +445,11 @@ public class AutoCollectService {
 
         if (target == null) {
 
-            // Для этого типа места нет - но другой тип может смерджиться
-            // в свой стек, поэтому слив продолжается, а не обрывается
-            return DrainStep.noTarget();
+            // Отказ по гейту режима (MATCHING не знает тип) остается тихим,
+            // как любой другой игнор; кончившееся место - повод для сообщения
+            // о полном боксе. Слив продолжается: другой тип может смерджиться
+            // в свой стек, поэтому обрывать его нельзя
+            return scan.hasSpaceFor(stack) ? DrainStep.none() : DrainStep.full();
 
         }
 
@@ -438,7 +460,7 @@ public class AutoCollectService {
         int inserted = target.insert(stack.clone());
 
         if (inserted <= 0) {
-            return DrainStep.none();
+            return DrainStep.full();
         }
 
         applyRemainder(item, stack, inserted);
@@ -552,7 +574,9 @@ public class AutoCollectService {
 
     /**
      * Размер листа ожидания игрока.
-     * Публичен для проверяемых тестов и диагностики в /shulker info.
+     *
+     * Публичен для проверяемых тестов: очередь - техническая деталь волн,
+     * игроку она не показывается и в чат не выводится.
      *
      * @param player игрок
      * @return число элементов в очереди переноса
@@ -560,7 +584,6 @@ public class AutoCollectService {
     public int waitListSize(@NotNull Player player) {
 
         PlayerWaitList waitList = waitLists.get(player.getUniqueId());
-
         return waitList == null ? 0 : waitList.size();
 
     }
@@ -569,7 +592,7 @@ public class AutoCollectService {
      * Шаг слива одного элемента листа ожидания.
      *
      * @param moved   сколько предметов перемещено
-     * @param noSpace приемник не нашелся для известного типа
+     * @param noSpace физически нет места ни в одном приемнике скана
      * @param blocked элемент вернули в голову листа, слив игрока отложен
      */
     private record DrainStep(int moved, boolean noSpace, boolean blocked) {
@@ -578,7 +601,7 @@ public class AutoCollectService {
             return new DrainStep(0, false, false);
         }
 
-        static DrainStep noTarget() {
+        static DrainStep full() {
             return new DrainStep(0, true, false);
         }
 
@@ -649,9 +672,22 @@ public class AutoCollectService {
             return;
         }
 
-        if (noSpace) {
-            messageService.send(player, MessageKey.AUTO_COLLECT_FULL, Map.of());
+        if (!noSpace) {
+            return;
         }
+
+        // Кулдаун на игрока: полный бокс под массовым дропом (взрыв крипера)
+        // остается одной строкой в чате, а не сообщением на каждую волну
+        long now = System.currentTimeMillis();
+        long cooldownMillis = configManager.getFullMessageCooldown() * 1000L;
+        Long lastNotice = fullNotices.get(player.getUniqueId());
+
+        if (lastNotice != null && now - lastNotice < cooldownMillis) {
+            return;
+        }
+
+        fullNotices.put(player.getUniqueId(), now);
+        messageService.send(player, MessageKey.AUTO_COLLECT_FULL, Map.of());
 
     }
 }

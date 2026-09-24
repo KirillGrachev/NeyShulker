@@ -72,7 +72,6 @@ public final class HexColorUtil {
         }
 
         String stripped = ChatColor.stripColor(color(text));
-
         return stripped == null ? "" : stripped;
 
     }

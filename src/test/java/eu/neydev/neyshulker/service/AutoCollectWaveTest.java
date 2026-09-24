@@ -3,7 +3,9 @@ package eu.neydev.neyshulker.service;
 import eu.neydev.neyshulker.NeyShulker;
 import eu.neydev.neyshulker.config.ConfigManager;
 import eu.neydev.neyshulker.config.type.CollectMode;
+import eu.neydev.neyshulker.config.type.MessageKey;
 import eu.neydev.neyshulker.registry.SessionRegistry;
+import eu.neydev.neyshulker.service.collect.PlayerDropTracker;
 import eu.neydev.neyshulker.util.FakeItemStack;
 import eu.neydev.neyshulker.util.ShulkerUtil;
 import eu.neydev.neyshulker.util.TestInventories;
@@ -25,6 +27,7 @@ import org.junit.jupiter.api.Test;
 import org.mockito.MockedStatic;
 
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -32,10 +35,13 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyMap;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -51,6 +57,7 @@ class AutoCollectWaveTest {
     private final MessageService messageService = mock(MessageService.class);
     private final SoundService soundService = mock(SoundService.class);
     private final PermissionService permissionService = mock(PermissionService.class);
+    private final PlayerDropTracker dropTracker = new PlayerDropTracker(() -> 0L);
     private final PluginManager pluginManager = mock(PluginManager.class);
 
     /**
@@ -167,13 +174,14 @@ class AutoCollectWaveTest {
         when(configManager.getPlayersPerWave()).thenReturn(playersPerWave);
         when(configManager.getActionsPerWave()).thenReturn(actionsPerWave);
         when(configManager.getQueuePerPlayer()).thenReturn(queuePerPlayer);
+        when(configManager.getFullMessageCooldown()).thenReturn(30);
         when(configManager.isAutoCollectBlacklisted(any())).thenReturn(false);
         when(configManager.isBlacklistEnabled()).thenReturn(false);
         when(configManager.getAutoCollectPriorityItems()).thenReturn(List.of());
 
         return new AutoCollectService(plugin, configManager, sessionRegistry,
                 new InventoryTransferService(), persistenceService,
-                messageService, soundService, permissionService);
+                messageService, soundService, permissionService, dropTracker);
 
     }
 
@@ -206,7 +214,7 @@ class AutoCollectWaveTest {
 
         AutoCollectService service = service(1, 64, 32);
 
-        try (MockedStatic<Bukkit> bukkit = bukkit(first, second)) {
+        try (MockedStatic<Bukkit> ignored = bukkit(first, second)) {
 
             service.wave();
 
@@ -235,7 +243,7 @@ class AutoCollectWaveTest {
 
         AutoCollectService service = service(5, 3, 32);
 
-        try (MockedStatic<Bukkit> bukkit = bukkit(fixture)) {
+        try (MockedStatic<Bukkit> ignored = bukkit(fixture)) {
 
             service.wave();
 
@@ -271,7 +279,7 @@ class AutoCollectWaveTest {
 
         AutoCollectService service = service(5, 64, 1);
 
-        try (MockedStatic<Bukkit> bukkit = bukkit(fixture)) {
+        try (MockedStatic<Bukkit> ignored = bukkit(fixture)) {
 
             service.wave();
 
@@ -283,6 +291,60 @@ class AutoCollectWaveTest {
 
             verify(second).remove();
             assertNotNull(fixture.boxContents().getItem(1), "На следующей волне второй дроп обнаружен заново");
+
+        }
+
+    }
+
+    @Test
+    @DisplayName("Полный бокс под массовым дропом: сообщение о полноте не чаще кулдауна")
+    void fullBoxNoticeRespectsCooldown() {
+
+        Item drop = drop(Material.DIAMOND, 1);
+        Fixture fixture = fixture(drop);
+
+        for (int slot = 0; slot < ShulkerUtil.SHULKER_SIZE; slot++) {
+            fixture.boxContents().setItem(slot, new FakeItemStack(Material.DIRT, 64));
+        }
+
+        AutoCollectService service = service(5, 64, 32);
+
+        try (MockedStatic<Bukkit> ignored = bukkit(fixture)) {
+
+            service.wave();
+            service.wave();
+            service.wave();
+
+            verify(drop, never()).remove();
+            verify(messageService, times(1))
+                    .send(fixture.player(), MessageKey.AUTO_COLLECT_FULL, Map.of());
+
+        }
+
+    }
+
+    @Test
+    @DisplayName("MATCHING: незнакомый тип при свободном месте отклоняется молча")
+    void matchingRejectionStaysSilent() {
+
+        Item drop = drop(Material.DIAMOND, 1);
+        Fixture fixture = fixture(drop);
+
+        fixture.boxContents().setItem(0, new FakeItemStack(Material.DIRT, 64));
+
+        AutoCollectService service = service(5, 64, 32);
+
+        // После хелпера: тот ставит дефолтный ALL, а последний stub выигрывает
+        when(configManager.getAutoCollectMode()).thenReturn(CollectMode.MATCHING);
+
+        try (MockedStatic<Bukkit> ignored = bukkit(fixture)) {
+
+            service.wave();
+            service.wave();
+
+            verify(drop, never()).remove();
+            verify(messageService, never())
+                    .send(eq(fixture.player()), eq(MessageKey.AUTO_COLLECT_FULL), anyMap());
 
         }
 

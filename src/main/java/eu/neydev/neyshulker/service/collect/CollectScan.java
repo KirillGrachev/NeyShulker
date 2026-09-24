@@ -30,6 +30,9 @@ import java.util.Map;
  * правила {@link #targetFor(ItemStack)}. Один и тот же расклад инвентаря
  * всегда дает один и тот же бокс, от волны к волне и от перезапуска к
  * перезапуску, — поведение можно объяснить игроку и проверить тестом.
+ * Открытое GUI приоритетнее боксов для типов, которые оно принимает по гейту
+ * режима: в MATCHING незнакомый сессии тип уходит на ярусы боксов, а не
+ * отказывает скану целиком.
  */
 public final class CollectScan {
 
@@ -41,6 +44,7 @@ public final class CollectScan {
     private final SessionCollectTarget sessionTarget;
     private final Map<Integer, BoxCollectTarget> boxes = new HashMap<>();
     private final List<Integer> slots = new ArrayList<>();
+    private boolean boxesBuilt;
 
     public CollectScan(@NotNull Player player,
                        @Nullable ShulkerSession session,
@@ -58,7 +62,7 @@ public final class CollectScan {
                 : new SessionCollectTarget(player, session, transferService);
 
         if (session == null) {
-            buildBoxes();
+            ensureBoxes();
         }
 
     }
@@ -85,23 +89,23 @@ public final class CollectScan {
      * INVENTORY держит порядок слотов инвентаря.
      *
      * При равенстве внутри яруса решает порядок слотов: побеждает меньший слот,
-     * поэтому выбор всегда воспроизводим. Открытое GUI приоритетнее боксов:
-     * игрок смотрит на него и ждет пополнения именно туда.
+     * поэтому выбор всегда воспроизводим. Открытое GUI приоритетнее боксов для
+     * типов, которые оно принимает по гейту режима: в MATCHING незнакомый сессии
+     * тип падает на ярусы боксов, а не отказывает скану целиком.
      *
      * @param stack предмет
      * @return цель или null, если допуска или места нет
      */
     public @Nullable CollectTarget targetFor(@NotNull ItemStack stack) {
 
-        CollectMode mode = configManager.getAutoCollectMode();
-
         if (sessionTarget != null) {
 
-            if (mode == CollectMode.MATCHING && !sessionHoldsType(stack)) {
-                return null;
+            if (sessionAccepts(stack)) {
+                return sessionTarget;
             }
 
-            return sessionTarget;
+            // Незнакомый сессии тип в MATCHING падает на ярусы боксов
+            ensureBoxes();
 
         }
 
@@ -151,7 +155,8 @@ public final class CollectScan {
             return typeTarget;
         }
 
-        boolean typeKnown = mode != CollectMode.MATCHING || holdsType(stack);
+        boolean typeKnown = configManager.getAutoCollectMode() != CollectMode.MATCHING
+                || holdsType(stack);
 
         if (!typeKnown) {
             return null;
@@ -195,6 +200,77 @@ public final class CollectScan {
         }
 
         return best;
+
+    }
+
+    /**
+     * Принимает ли открытое GUI предмет по гейту режима: в MATCHING сессия
+     * работает только с типами, которые уже хранит, а незнакомый тип уходит
+     * на ярусы боксов вместо отказа всего скана.
+     */
+    private boolean sessionAccepts(@NotNull ItemStack stack) {
+        return configManager.getAutoCollectMode() != CollectMode.MATCHING
+                || sessionHoldsType(stack);
+    }
+
+    /**
+     * Есть ли физически место под предмет хотя бы в одном приемнике: частичный
+     * стек того же типа или свободный слот.
+     *
+     * Отказ по гейту режима (MATCHING не знает тип) местом не считается: такой
+     * дроп собирается молча, как любой другой игнор, и не требует от игрока
+     * сообщения о полном боксе.
+     *
+     * @param stack предмет
+     * @return true если приемники скана способны принять предмет
+     */
+    public boolean hasSpaceFor(@NotNull ItemStack stack) {
+
+        if (sessionTarget != null && sessionAccepts(stack)) {
+            return sessionHasSpace(stack);
+        }
+
+        if (sessionTarget != null) {
+            ensureBoxes();
+        }
+
+        for (Integer slot : slots) {
+
+            BoxCollectTarget target = boxes.get(slot);
+
+            if (mergeRoom(target, stack) > 0
+                    || ShulkerUtil.countFreeSlots(contentsOf(target)) > 0) {
+                return true;
+            }
+
+        }
+
+        return false;
+
+    }
+
+    /**
+     * Есть ли место в открытом GUI: свободный слот или частичный стек того же типа.
+     */
+    private boolean sessionHasSpace(@NotNull ItemStack stack) {
+
+        org.bukkit.inventory.Inventory inventory = sessionTarget.getSession().inventory();
+
+        for (int i = 0; i < inventory.getSize(); i++) {
+
+            ItemStack slot = inventory.getItem(i);
+
+            if (ShulkerUtil.isEmpty(slot)) {
+                return true;
+            }
+
+            if (slot.isSimilar(stack) && slot.getAmount() < slot.getMaxStackSize()) {
+                return true;
+            }
+
+        }
+
+        return false;
 
     }
 
@@ -316,6 +392,22 @@ public final class CollectScan {
 
         // Вторая рука - полноценное место для шалкера; слот 40 и так последний
         addBox(ShulkerUtil.OFF_HAND_SLOT, inventory.getItem(ShulkerUtil.OFF_HAND_SLOT));
+
+    }
+
+    /**
+     * Строит боксы не раньше, чем они реально понадобятся: пока открытое GUI
+     * принимает предметы, чтение меты каждого бокса инвентаря - лишняя работа
+     * волны. Точка входа для FALL-THROUGH ветки MATCHING и проверки места.
+     */
+    private void ensureBoxes() {
+
+        if (boxesBuilt) {
+            return;
+        }
+
+        boxesBuilt = true;
+        buildBoxes();
 
     }
 

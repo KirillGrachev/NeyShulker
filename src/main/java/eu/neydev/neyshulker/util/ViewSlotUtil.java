@@ -49,7 +49,6 @@ public final class ViewSlotUtil {
         }
 
         int topSize = view.getTopInventory().getSize();
-
         return rawSlot < topSize ? rawSlot : OUTSIDE;
 
     }
@@ -94,7 +93,6 @@ public final class ViewSlotUtil {
         }
 
         int storageSize = storageSize(view.getBottomInventory());
-
         return bottomSlot < storageSize ? bottomSlot : OUTSIDE;
 
     }

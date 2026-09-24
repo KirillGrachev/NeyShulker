@@ -53,7 +53,6 @@ public class ConfigManager implements NeyShulkerConfig {
     private static final String PATH_OPEN_METHOD = "settings.shulker.open_method";
     private static final String PATH_TITLE = "settings.shulker.title";
     private static final String PATH_TITLE_MODE = "settings.shulker.title.mode";
-    private static final String PATH_TITLE_FORMAT = "settings.shulker.title.format";
     private static final String PATH_SAVE_INTERVAL = "settings.shulker.save_interval";
     private static final String PATH_TITLE_NAMES = "settings.shulker.title.names";
     private static final String PATH_BLOCKED_ITEMS_ENABLED = "settings.shulker.blocked_items.enabled";
@@ -71,7 +70,10 @@ public class ConfigManager implements NeyShulkerConfig {
     private static final String PATH_AUTO_COLLECT_ONLY_FULL = "settings.auto_collect.rules.only_full_inventory";
     private static final String PATH_AUTO_COLLECT_MERGE = "settings.auto_collect.rules.merge_into_existing";
     private static final String PATH_AUTO_COLLECT_MODE = "settings.auto_collect.mode";
+    private static final String PATH_FULL_MESSAGE_COOLDOWN = "settings.auto_collect.full_message_cooldown";
     private static final String PATH_AUTO_COLLECT_IGNORE_DELAY = "settings.auto_collect.rules.ignore_pickup_delay";
+    private static final String PATH_IGNORE_PLAYER_DROPPED = "settings.auto_collect.rules.ignore_player_dropped";
+    private static final String PATH_RESPECT_NEARBY_PLAYERS = "settings.auto_collect.rules.respect_nearby_players";
     private static final String PATH_AUTO_COLLECT_PERMISSION = "settings.auto_collect.permission.required";
     private static final String PATH_AUTO_COLLECT_FILL_ORDER = "settings.auto_collect.rules.fill_order";
     private static final String PATH_AUTO_COLLECT_PRIORITY = "settings.auto_collect.priority_items";
@@ -86,6 +88,7 @@ public class ConfigManager implements NeyShulkerConfig {
 
 
     private static final int MIN_INTERVAL_TICKS = 1;
+    private static final int MIN_COOLDOWN_SECONDS = 0;
     private static final double MIN_DISTANCE = 0.0D;
 
 
@@ -124,10 +127,13 @@ public class ConfigManager implements NeyShulkerConfig {
     private int wavePlayers;
     private int waveActions;
     private int waveQueue;
+    private int fullMessageCooldown;
     private boolean autoCollectOnlyWhenInventoryFull;
     private boolean autoCollectMergeIntoExisting;
     private CollectMode autoCollectMode;
     private boolean autoCollectIgnorePickupDelay;
+    private boolean autoCollectIgnorePlayerDropped;
+    private double autoCollectRespectNearbyPlayers;
     private FillOrderType autoCollectFillOrder;
     private List<Material> autoCollectPriorityItems;
     private Set<Material> autoCollectBlacklist;
@@ -253,6 +259,11 @@ public class ConfigManager implements NeyShulkerConfig {
     }
 
     @Override
+    public int getFullMessageCooldown() {
+        return fullMessageCooldown;
+    }
+
+    @Override
     public boolean isAutoCollectOnlyWhenInventoryFull() {
         return autoCollectOnlyWhenInventoryFull;
     }
@@ -270,6 +281,16 @@ public class ConfigManager implements NeyShulkerConfig {
     @Override
     public boolean isAutoCollectIgnorePickupDelay() {
         return autoCollectIgnorePickupDelay;
+    }
+
+    @Override
+    public boolean isAutoCollectIgnorePlayerDropped() {
+        return autoCollectIgnorePlayerDropped;
+    }
+
+    @Override
+    public double getAutoCollectRespectNearbyPlayers() {
+        return autoCollectRespectNearbyPlayers;
     }
 
     @Override
@@ -399,10 +420,16 @@ public class ConfigManager implements NeyShulkerConfig {
                 PATH_WAVE_ACTIONS, MIN_INTERVAL_TICKS);
         waveQueue = intOrWarn(config.getInt(PATH_WAVE_QUEUE, 32),
                 PATH_WAVE_QUEUE, MIN_INTERVAL_TICKS);
+        fullMessageCooldown = intOrWarn(config.getInt(PATH_FULL_MESSAGE_COOLDOWN, 30),
+                PATH_FULL_MESSAGE_COOLDOWN, MIN_COOLDOWN_SECONDS);
         autoCollectOnlyWhenInventoryFull = config.getBoolean(PATH_AUTO_COLLECT_ONLY_FULL, false);
         autoCollectMergeIntoExisting = config.getBoolean(PATH_AUTO_COLLECT_MERGE, true);
         autoCollectMode = parseCollectMode();
         autoCollectIgnorePickupDelay = config.getBoolean(PATH_AUTO_COLLECT_IGNORE_DELAY, false);
+        autoCollectIgnorePlayerDropped = config.getBoolean(PATH_IGNORE_PLAYER_DROPPED, true);
+        autoCollectRespectNearbyPlayers = doubleOrWarn(
+                config.getDouble(PATH_RESPECT_NEARBY_PLAYERS, 4.5D),
+                PATH_RESPECT_NEARBY_PLAYERS, 0.0D);
         autoCollectFillOrder = parseFillOrder();
         autoCollectBlacklist = readMaterials(PATH_AUTO_COLLECT_IGNORED,
                 PATH_LEGACY_AUTO_COLLECT_BLACKLIST, DEFAULT_AUTO_COLLECT_BLACKLIST);
@@ -425,7 +452,8 @@ public class ConfigManager implements NeyShulkerConfig {
                 continue;
             }
 
-            messages.put(key, readColoredLines(path + ".text", key.getDefaultMessage()));
+            messages.put(key, dropLegacyQueueLine(key,
+                    readColoredLines(path + ".text", key.getDefaultMessage())));
 
         }
 
@@ -684,6 +712,41 @@ public class ConfigManager implements NeyShulkerConfig {
                 "defaultValue", String.valueOf(minimum));
 
         return minimum;
+
+    }
+
+    /**
+     * Убирает наследие 2.13.0: строку очереди переноса из info_idle.
+     *
+     * Очередь листа ожидания - техническая деталь волн, игроку она не нужна,
+     * поэтому плейсхолдер {queue} больше не подставляется. Старые конфигурации
+     * продолжают загружаться: строка с плейсхолдером молча исключается из
+     * сообщения, а в консоль уходит подсказка о правке файла.
+     *
+     * @param key   ключ сообщения
+     * @param lines прочитанные строки сообщения
+     * @return строки без устаревшего плейсхолдера очереди
+     */
+    private @NotNull List<String> dropLegacyQueueLine(@NotNull MessageKey key,
+                                                      @NotNull List<String> lines) {
+
+        if (key != MessageKey.INFO_IDLE) {
+            return lines;
+        }
+
+        List<String> kept = lines.stream()
+                .filter(line -> !line.contains("{queue}"))
+                .toList();
+
+        if (kept.size() == lines.size()) {
+            return lines;
+        }
+
+        consoleService.log(ConsoleMessage.LEGACY_PATH,
+                "path", "messages.info_idle.text",
+                "replacement", "the same lines without the {queue} placeholder");
+
+        return kept;
 
     }
 

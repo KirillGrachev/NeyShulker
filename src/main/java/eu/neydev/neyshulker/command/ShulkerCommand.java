@@ -150,8 +150,7 @@ public class ShulkerCommand implements TabExecutor {
                     && autoCollectService.isEnabledFor(player);
 
             messageService.send(player, MessageKey.INFO_IDLE, Map.of(
-                    "state", state(autoCollectActive),
-                    "queue", String.valueOf(autoCollectService.waitListSize(player))));
+                    "state", state(autoCollectActive)));
 
             return;
 

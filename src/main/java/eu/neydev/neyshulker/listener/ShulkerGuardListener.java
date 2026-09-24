@@ -7,6 +7,7 @@ import eu.neydev.neyshulker.model.ValidationResult;
 import eu.neydev.neyshulker.registry.SessionRegistry;
 import eu.neydev.neyshulker.service.MessageService;
 import eu.neydev.neyshulker.service.ShulkerValidationService;
+import eu.neydev.neyshulker.util.ShulkerUtil;
 import eu.neydev.neyshulker.util.ViewSlotUtil;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
@@ -21,14 +22,28 @@ import org.bukkit.inventory.ItemStack;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
+import java.util.Map;
+import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
+
 /**
  * Слушатель-охранник открытого шалкер-бокса.
  *
  * Закрывает все способы вытащить или переместить сам бокс, пока GUI открыт,
  * а также не пускает внутрь запрещенные предметы (черный список, вложенные шалкеры).
  * Именно отсутствие этих проверок приводило к дюпу при быстром перебирании предметов.
+ * Содержимое бокса и посторонние предметы выбрасываются из GUI свободно:
+ * охранник трогает только сам открытый бокс и ничего лишнего.
  */
 public class ShulkerGuardListener implements Listener {
+
+    /**
+     * Окно жизни метки пропущенного клика: ванильный PlayerDropItemEvent
+     * приходит следом за кликом на том же тике, большего окна не нужно.
+     */
+    private static final long DROP_MARKER_WINDOW_MILLIS = 250L;
+
+    private final Map<UUID, Long> allowedDrops = new ConcurrentHashMap<>();
 
     private final SessionRegistry sessionRegistry;
     private final ShulkerValidationService validationService;
@@ -106,7 +121,10 @@ public class ShulkerGuardListener implements Listener {
         // 3. Беремый предмет не может быть шалкер-боксом или запрещенным
         if (clickInShulker && isDisallowed(player, event.getCurrentItem())) {
             cancel(event, player, validationService.canEnterShulker(player, event.getCurrentItem()));
+            return;
         }
+
+        rememberAllowedDrop(player, event);
 
     }
 
@@ -146,16 +164,28 @@ public class ShulkerGuardListener implements Listener {
     }
 
     /**
-     * Q выбрасывает предмет из выбранного слота хотбара - того самого,
-     * в котором лежит открытый бокс. Сравнение по isSimilar здесь неприменимо:
-     * после автосохранения мета предмета уже отличается от слепка сессии.
+     * Выброс предмета при живом GUI почти всегда легален: содержимое бокса
+     * и посторонние предметы выбрасываются из GUI свободно, а сам бокс
+     * заблокирован еще на уровне клика. Маркер пропущенного клика отличает
+     * ванильный выброс из GUI от выброса чужим путем (команда, сторонний
+     * плагин) - только последний может донести сам открытый бокс.
      */
     @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
     public void onPlayerDropItem(@NotNull PlayerDropItemEvent event) {
 
         Player player = event.getPlayer();
 
-        if (validationService.isHeldOpenShulker(player)) {
+        if (!sessionRegistry.hasSession(player.getUniqueId())) {
+            return;
+        }
+
+        if (consumeAllowedDrop(player)) {
+            return;
+        }
+
+        ItemStack dropped = event.getItemDrop().getItemStack();
+
+        if (validationService.isDroppedOpenShulker(player, dropped)) {
             event.setCancelled(true);
             messageService.send(player, MessageKey.DROP_BLOCKED);
         }
@@ -178,12 +208,45 @@ public class ShulkerGuardListener implements Listener {
     }
 
     /**
+     * Запоминает ванильный выброс, который guard пропустил из GUI:
+     * Q, Ctrl+Q по слоту или клик мимо окна с предметом на курсоре.
+     * Следом за таким кликом приходит легальный PlayerDropItemEvent.
+     * Без метки идентичный бокс-близнец из соседнего слота неотличим
+     * от открытого, и охранник заблокировал бы посторонний выброс.
+     */
+    private void rememberAllowedDrop(@NotNull Player player, @NotNull InventoryClickEvent event) {
+
+        ClickType click = event.getClick();
+        boolean throwFromSlot = click == ClickType.DROP || click == ClickType.CONTROL_DROP;
+        boolean throwFromCursor = event.getRawSlot() < 0 && !ShulkerUtil.isEmpty(event.getCursor());
+
+        if (!throwFromSlot && !throwFromCursor) {
+            return;
+        }
+
+        long now = System.currentTimeMillis();
+
+        allowedDrops.put(player.getUniqueId(), now);
+        allowedDrops.entrySet().removeIf(entry -> now - entry.getValue() > DROP_MARKER_WINDOW_MILLIS);
+
+    }
+
+    /**
+     * Снимает метку пропущенного клика: выброс пришел из GUI и легален.
+     */
+    private boolean consumeAllowedDrop(@NotNull Player player) {
+
+        Long markedAt = allowedDrops.remove(player.getUniqueId());
+        return markedAt != null && System.currentTimeMillis() - markedAt <= DROP_MARKER_WINDOW_MILLIS;
+
+    }
+
+    /**
      * Проверяет, указывает ли сырой слот клика на сам открытый шалкер-бокс.
      */
     private boolean isShulkerSlot(@NotNull InventoryClickEvent event, @NotNull ShulkerSession session) {
 
         int bottomSlot = ViewSlotUtil.bottomSlot(event.getView(), event.getRawSlot());
-
         return validationService.isShulkerSlot(session, bottomSlot);
 
     }
@@ -191,7 +254,6 @@ public class ShulkerGuardListener implements Listener {
     private boolean isShulkerSlot(@NotNull Player player, int rawSlot, @NotNull ShulkerSession session) {
 
         int bottomSlot = ViewSlotUtil.bottomSlot(player.getOpenInventory(), rawSlot);
-
         return validationService.isShulkerSlot(session, bottomSlot);
 
     }

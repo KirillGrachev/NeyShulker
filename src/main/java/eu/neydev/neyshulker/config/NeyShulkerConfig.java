@@ -59,6 +59,12 @@ public interface NeyShulkerConfig {
 
     int getQueuePerPlayer();
 
+    /**
+     * Пауза в секундах между повторными сообщениями о полном боксе для одного
+     * игрока: массовый дроп не превращает чат в простыню уведомлений.
+     */
+    int getFullMessageCooldown();
+
     boolean isAutoCollectOnlyWhenInventoryFull();
 
     boolean isAutoCollectMergeIntoExisting();
@@ -66,6 +72,16 @@ public interface NeyShulkerConfig {
     CollectMode getAutoCollectMode();
 
     boolean isAutoCollectIgnorePickupDelay();
+
+    /**
+     * @return true - авто-сбор не трогает предметы, выброшенные игроками
+     */
+    boolean isAutoCollectIgnorePlayerDropped();
+
+    /**
+     * @return радиус в блоках: дроп, у которого стоит другой игрок, не собирается (0 выключает)
+     */
+    double getAutoCollectRespectNearbyPlayers();
 
     FillOrderType getAutoCollectFillOrder();
 

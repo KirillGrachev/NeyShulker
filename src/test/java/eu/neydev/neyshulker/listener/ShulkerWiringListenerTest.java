@@ -16,7 +16,6 @@ import org.bukkit.event.inventory.InventoryDragEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
-import org.bukkit.inventory.PlayerInventory;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.MockedStatic;
@@ -44,7 +43,6 @@ class ShulkerWiringListenerTest {
     private final AutoCollectService autoCollectService = mock(AutoCollectService.class);
 
     private final Player player = mock(Player.class);
-    private final PlayerInventory bottom = TestInventories.playerInventory();
     private final Inventory gui = TestInventories.inventory(27);
 
     private final ShulkerSession session = session();

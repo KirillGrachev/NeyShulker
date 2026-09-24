@@ -20,11 +20,14 @@ import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.PlayerInventory;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
@@ -178,7 +181,11 @@ class ShulkerCommandTest {
 
         commandExecutor().onCommand(player, command, "shulker", new String[]{"info"});
 
-        verify(messageService).send(eq(player), eq(MessageKey.INFO_IDLE), anyMap());
+        ArgumentCaptor<Map<String, String>> placeholders = ArgumentCaptor.forClass(Map.class);
+
+        verify(messageService).send(eq(player), eq(MessageKey.INFO_IDLE), placeholders.capture());
+        assertFalse(placeholders.getValue().containsKey("queue"),
+                "Очередь переноса - техническая деталь волн, в чат не выводится");
 
     }
 

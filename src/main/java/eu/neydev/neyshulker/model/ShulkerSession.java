@@ -108,7 +108,6 @@ public record ShulkerSession(
     public boolean isOnline() {
 
         Player player = getPlayer();
-
         return player != null && player.isOnline();
 
     }

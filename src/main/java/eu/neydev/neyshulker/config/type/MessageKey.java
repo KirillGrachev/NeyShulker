@@ -70,8 +70,7 @@ public enum MessageKey {
             "{prefix}&#ffe066Auto-collect disabled."),
 
     INFO_IDLE("info_idle", true, "{prefix}&7No open shulker boxes.\n"
-            + "&7Auto-collect: {state}\n"
-            + "&7Transfer queue: &f{queue}"),
+            + "&7Auto-collect: {state}"),
 
     INFO_SESSION("info_session", true, "{prefix}&dShulker: &f{name}\n"
             + "&dSlot: &f{slot}\n"

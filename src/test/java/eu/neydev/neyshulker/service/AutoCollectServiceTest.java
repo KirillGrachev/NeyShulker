@@ -3,6 +3,7 @@ package eu.neydev.neyshulker.service;
 import eu.neydev.neyshulker.NeyShulker;
 import eu.neydev.neyshulker.config.ConfigManager;
 import eu.neydev.neyshulker.registry.SessionRegistry;
+import eu.neydev.neyshulker.service.collect.PlayerDropTracker;
 import eu.neydev.neyshulker.util.FakeItemStack;
 import eu.neydev.neyshulker.util.ShulkerUtil;
 import eu.neydev.neyshulker.util.TestInventories;
@@ -28,7 +29,6 @@ import java.util.List;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockStatic;
@@ -48,6 +48,7 @@ class AutoCollectServiceTest {
     private final MessageService messageService = mock(MessageService.class);
     private final SoundService soundService = mock(SoundService.class);
     private final PermissionService permissionService = mock(PermissionService.class);
+    private final PlayerDropTracker dropTracker = new PlayerDropTracker(() -> 0L);
 
     private final Player player = mock(Player.class);
     private final PlayerInventory playerInventory = TestInventories.playerInventory();
@@ -55,6 +56,134 @@ class AutoCollectServiceTest {
 
     private final ItemStack shulker = shulker();
     private final Item drop = drop();
+
+    @Test
+    @DisplayName("Брошенный игроком предмет авто-сбор не всасывает")
+    void thrownDropIsNotCollected() {
+
+        when(configManager.isAutoCollectIgnorePlayerDropped()).thenReturn(true);
+
+        dropTracker.mark(drop);
+
+        playerInventory.setItem(0, shulker);
+        when(playerInventory.getContents()).thenReturn(new ItemStack[]{shulker});
+
+        AutoCollectService service = service();
+
+        service.collectAround(player);
+
+        verify(drop, never()).remove();
+
+    }
+
+    @Test
+    @DisplayName("Дроп с флагом владельца авто-сбор пропускает")
+    void ownedDropIsNotCollected() {
+
+        when(configManager.isAutoCollectIgnorePlayerDropped()).thenReturn(true);
+        when(drop.getOwner()).thenReturn(java.util.UUID.randomUUID());
+
+        playerInventory.setItem(0, shulker);
+        when(playerInventory.getContents()).thenReturn(new ItemStack[]{shulker});
+
+        AutoCollectService service = service();
+
+        service.collectAround(player);
+
+        verify(drop, never()).remove();
+
+    }
+
+    @Test
+    @DisplayName("У дропа стоит другой игрок - лут не всасывается")
+    void dropNearOtherPlayerIsNotCollected() {
+
+        when(configManager.getAutoCollectRespectNearbyPlayers()).thenReturn(4.5D);
+
+        Location at = drop.getLocation();
+
+        Player other = mock(Player.class);
+
+        when(other.isOnline()).thenReturn(true);
+        when(other.getLocation()).thenReturn(at);
+
+        playerInventory.setItem(0, shulker);
+        when(playerInventory.getContents()).thenReturn(new ItemStack[]{shulker});
+
+        AutoCollectService service = service();
+
+        when(player.getWorld().getPlayers()).thenReturn(List.of(player, other));
+
+        service.collectAround(player);
+
+        verify(drop, never()).remove();
+
+    }
+
+    @Test
+    @DisplayName("Другой игрок далеко от дропа - лут всасывается")
+    void distantPlayerDoesNotBlockCollect() {
+
+        when(configManager.getAutoCollectRespectNearbyPlayers()).thenReturn(4.5D);
+
+        Location far = mock(Location.class);
+
+        when(far.distanceSquared(drop.getLocation())).thenReturn(100.0D);
+
+        Player other = mock(Player.class);
+
+        when(other.isOnline()).thenReturn(true);
+        when(other.getLocation()).thenReturn(far);
+
+        playerInventory.setItem(0, shulker);
+        when(playerInventory.getContents()).thenReturn(new ItemStack[]{shulker});
+
+        AutoCollectService service = service();
+
+        when(player.getWorld().getPlayers()).thenReturn(List.of(player, other));
+
+        PluginManager pluginManager = mock(PluginManager.class);
+
+        try (MockedStatic<Bukkit> bukkit = mockStatic(Bukkit.class)) {
+
+            bukkit.when(Bukkit::getPluginManager).thenReturn(pluginManager);
+
+            service.collectAround(player);
+
+        }
+
+        verify(drop).remove();
+        assertEquals(3, boxContents.getItem(0).getAmount());
+
+    }
+
+    @Test
+    @DisplayName("Единственный игрок рядом - сам собирающий: лут всасывается")
+    void soloCollectorStillCollects() {
+
+        when(configManager.getAutoCollectRespectNearbyPlayers()).thenReturn(4.5D);
+
+        playerInventory.setItem(0, shulker);
+        when(playerInventory.getContents()).thenReturn(new ItemStack[]{shulker});
+
+        AutoCollectService service = service();
+
+        when(player.getWorld().getPlayers()).thenReturn(List.of(player));
+
+        PluginManager pluginManager = mock(PluginManager.class);
+
+        try (MockedStatic<Bukkit> bukkit = mockStatic(Bukkit.class)) {
+
+            bukkit.when(Bukkit::getPluginManager).thenReturn(pluginManager);
+
+            service.collectAround(player);
+
+        }
+
+        verify(drop).remove();
+        assertEquals(3, boxContents.getItem(0).getAmount());
+
+    }
 
     private ItemStack shulker() {
 
@@ -88,6 +217,7 @@ class AutoCollectServiceTest {
         when(drop.isValid()).thenReturn(true);
         when(drop.getPickupDelay()).thenReturn(0);
         when(drop.getOwner()).thenReturn(null);
+        when(drop.getUniqueId()).thenReturn(java.util.UUID.randomUUID());
         when(drop.getLocation()).thenReturn(dropLocation);
         when(drop.getItemStack()).thenReturn(new FakeItemStack(Material.DIAMOND, 3));
 
@@ -113,6 +243,7 @@ class AutoCollectServiceTest {
         when(configManager.getAutoCollectMaxDistance()).thenReturn(3.0D);
         when(configManager.isAutoCollectIgnorePickupDelay()).thenReturn(false);
         when(configManager.getQueuePerPlayer()).thenReturn(64);
+        when(configManager.getFullMessageCooldown()).thenReturn(30);
         when(configManager.isAutoCollectBlacklisted(any())).thenReturn(false);
         when(configManager.isBlacklistEnabled()).thenReturn(false);
         when(configManager.getAutoCollectPriorityItems()).thenReturn(List.of());
@@ -131,7 +262,7 @@ class AutoCollectServiceTest {
 
         return new AutoCollectService(plugin, configManager, sessionRegistry,
                 new InventoryTransferService(), persistenceService,
-                messageService, soundService, permissionService);
+                messageService, soundService, permissionService, dropTracker);
 
     }
 
