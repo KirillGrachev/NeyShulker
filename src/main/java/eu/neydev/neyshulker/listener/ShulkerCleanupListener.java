@@ -1,6 +1,5 @@
 package eu.neydev.neyshulker.listener;
 
-import eu.neydev.neyshulker.NeyShulker;
 import eu.neydev.neyshulker.inventory.NeyShulkerViewer;
 import eu.neydev.neyshulker.model.ShulkerSession;
 import eu.neydev.neyshulker.registry.SessionRegistry;
@@ -24,11 +23,13 @@ public class ShulkerCleanupListener implements Listener {
     private final ShulkerCloseService closeService;
     private final AutoCollectService autoCollectService;
 
-    public ShulkerCleanupListener(@NotNull NeyShulker plugin) {
+    public ShulkerCleanupListener(@NotNull SessionRegistry sessionRegistry,
+                                  @NotNull ShulkerCloseService closeService,
+                                  @NotNull AutoCollectService autoCollectService) {
 
-        this.sessionRegistry = plugin.getServices().getSessionRegistry();
-        this.closeService = plugin.getServices().getCloseService();
-        this.autoCollectService = plugin.getServices().getAutoCollectService();
+        this.sessionRegistry = sessionRegistry;
+        this.closeService = closeService;
+        this.autoCollectService = autoCollectService;
 
     }
 

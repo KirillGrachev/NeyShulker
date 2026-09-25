@@ -20,8 +20,6 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 import java.util.UUID;
-import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -303,10 +301,10 @@ class CollectScanTargetTest {
         when(inventory.getContents()).thenReturn(contents);
         when(player.getInventory()).thenReturn(inventory);
 
-        ShulkerSession session = new ShulkerSession(UUID.randomUUID(), UUID.randomUUID(),
-                new FakeItemStack(Material.WHITE_SHULKER_BOX, 1), sessionInventory,
-                System.currentTimeMillis(), new AtomicInteger(0),
-                new AtomicBoolean(), new AtomicBoolean(), new AtomicBoolean());
+        when(player.getUniqueId()).thenReturn(UUID.randomUUID());
+
+        ShulkerSession session = ShulkerSession.create(UUID.randomUUID(), player,
+                new FakeItemStack(Material.WHITE_SHULKER_BOX, 1), () -> sessionInventory, 0);
         return new CollectScan(player, session, configManager, transferService, persistenceService);
 
     }

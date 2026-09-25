@@ -29,12 +29,22 @@ jobs:
           java-version: 21
           cache: maven
 
-      # verify = compile + tests + jacoco report + coverage gate (jacoco.line.minimum)
+      # verify = compile (+ ErrorProne) + tests + jacoco report + coverage gate + spotless
       - name: Build and test
         run: mvn -B -ntp verify
+
+      # Контрольная сумма рядом с jar: пользователь может проверить,
+      # что скачал именно собранный релизом файл
+      - name: Checksum
+        run: |
+          cd target
+          sha256sum NeyShulker-*.jar > NeyShulker.jar.sha256
+          cat NeyShulker.jar.sha256
 
       - name: Publish release with jar
         uses: softprops/action-gh-release@v2
         with:
-          files: target/NeyShulker-*.jar
+          files: |
+            target/NeyShulker-*.jar
+            target/NeyShulker.jar.sha256
           generate_release_notes: true

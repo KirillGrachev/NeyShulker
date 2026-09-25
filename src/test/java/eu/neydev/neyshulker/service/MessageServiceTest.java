@@ -1,5 +1,6 @@
 package eu.neydev.neyshulker.service;
 
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import eu.neydev.neyshulker.config.ConfigManager;
 import eu.neydev.neyshulker.config.type.MessageKey;
 import org.bukkit.command.CommandSender;
@@ -123,6 +124,45 @@ class MessageServiceTest {
 
         verify(player).sendMessage("§7> §cError");
         verify(player).sendMessage("§aClean");
+
+    }
+
+
+    @Test
+    @DisplayName("Префикс вызывающего важнее префикса конфига (putIfAbsent)")
+    void callerPrefixWins() {
+
+        when(configManager.areMessagesEnabled()).thenReturn(true);
+        when(configManager.getMessagePrefix()).thenReturn("CFG ");
+        when(configManager.getMessages(MessageKey.RELOAD)).thenReturn(List.of("{prefix}text"));
+
+        List<String> lines = messageService.build(MessageKey.RELOAD, Map.of("prefix", "CALLER "));
+
+        assertEquals(List.of("CALLER text"), lines);
+
+    }
+
+    @Test
+    @DisplayName("build выключенного сообщения пуст")
+    void buildDisabledMessageIsEmpty() {
+
+        when(configManager.getMessages(MessageKey.SAVED)).thenReturn(List.of());
+
+        assertTrue(messageService.build(MessageKey.SAVED, Map.of()).isEmpty());
+
+    }
+
+    @Test
+    @DisplayName("sendRaw консоли применяет цвета и префикс")
+    void sendRawWorksForConsole() {
+
+        CommandSender console = mock(CommandSender.class);
+
+        when(configManager.areMessagesEnabled()).thenReturn(true);
+        when(configManager.getMessagePrefix()).thenReturn("P ");
+
+        messageService.sendRaw(console, "{prefix}&cErr");
+        verify(console).sendMessage("P §cErr");
 
     }
 

@@ -1,6 +1,6 @@
 package eu.neydev.neyshulker.service.collect;
 
-import eu.neydev.neyshulker.config.ConfigManager;
+import eu.neydev.neyshulker.config.NeyShulkerConfig;
 import eu.neydev.neyshulker.config.type.CollectMode;
 import eu.neydev.neyshulker.config.type.FillOrderType;
 import eu.neydev.neyshulker.model.ShulkerSession;
@@ -8,13 +8,14 @@ import eu.neydev.neyshulker.service.InventoryTransferService;
 import eu.neydev.neyshulker.service.ShulkerPersistenceService;
 import eu.neydev.neyshulker.util.ShulkerUtil;
 import org.bukkit.entity.Player;
+import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.PlayerInventory;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
-import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -25,41 +26,40 @@ import java.util.Map;
  * за скан, последовательные вставки видят накопленный результат, физическая
  * запись и синхронизация клиента происходят один раз в {@link #flush()}.
  *
- * Выбор цели детерминирован: боксы просматриваются в порядке слотов инвентаря
- * (вторая рука последняя), а между кандидатами внутри яруса решают явные
- * правила {@link #targetFor(ItemStack)}. Один и тот же расклад инвентаря
- * всегда дает один и тот же бокс, от волны к волне и от перезапуска к
- * перезапуску, — поведение можно объяснить игроку и проверить тестом.
- * Открытое GUI приоритетнее боксов для типов, которые оно принимает по гейту
- * режима: в MATCHING незнакомый сессии тип уходит на ярусы боксов, а не
- * отказывает скану целиком.
+ * Выбор цели детерминирован: боксы просматриваются в порядке слотов
+ * инвентаря (LinkedHashMap хранит порядок добавления), а между кандидатами
+ * внутри яруса решают явные правила {@link #targetFor(ItemStack)}. Один и тот
+ * же расклад инвентаря всегда дает один и тот же бокс, от волны к волне и от
+ * перезапуска к перезапуску, - поведение можно объяснить игроку и проверить
+ * тестом. Открытое GUI приоритетнее боксов для типов, которые оно принимает
+ * по гейту режима: в MATCHING незнакомый сессии тип уходит на ярусы боксов,
+ * а не отказывает скану целиком.
  */
 public final class CollectScan {
 
     private final Player player;
-    private final ConfigManager configManager;
+    private final NeyShulkerConfig config;
     private final InventoryTransferService transferService;
     private final ShulkerPersistenceService persistenceService;
 
     private final SessionCollectTarget sessionTarget;
-    private final Map<Integer, BoxCollectTarget> boxes = new HashMap<>();
-    private final List<Integer> slots = new ArrayList<>();
+    private final Map<Integer, BoxCollectTarget> boxes = new LinkedHashMap<>();
     private boolean boxesBuilt;
 
     public CollectScan(@NotNull Player player,
                        @Nullable ShulkerSession session,
-                       @NotNull ConfigManager configManager,
+                       @NotNull NeyShulkerConfig config,
                        @NotNull InventoryTransferService transferService,
                        @NotNull ShulkerPersistenceService persistenceService) {
 
         this.player = player;
-        this.configManager = configManager;
+        this.config = config;
         this.transferService = transferService;
         this.persistenceService = persistenceService;
 
         this.sessionTarget = session == null
                 ? null
-                : new SessionCollectTarget(player, session, transferService);
+                : new SessionCollectTarget(session, transferService);
 
         if (session == null) {
             ensureBoxes();
@@ -89,9 +89,9 @@ public final class CollectScan {
      * INVENTORY держит порядок слотов инвентаря.
      *
      * При равенстве внутри яруса решает порядок слотов: побеждает меньший слот,
-     * поэтому выбор всегда воспроизводим. Открытое GUI приоритетнее боксов для
-     * типов, которые оно принимает по гейту режима: в MATCHING незнакомый сессии
-     * тип падает на ярусы боксов, а не отказывает скану целиком.
+     * поэтому выбор всегда воспроизводим. Статистика боксов (остаток места,
+     * количество типа, свободные слоты) считается одним проходом на вызов,
+     * а не ресканируется на каждом ярусе.
      *
      * @param stack предмет
      * @return цель или null, если допуска или места нет
@@ -109,18 +109,19 @@ public final class CollectScan {
 
         }
 
-        if (configManager.isAutoCollectMergeIntoExisting()) {
+        List<BoxStats> stats = statsFor(stack);
+
+        // Ярус 1: частичный стек того же типа с наибольшим остатком места
+        if (config.isAutoCollectMergeIntoExisting()) {
 
             BoxCollectTarget mergeTarget = null;
             int bestRoom = 0;
 
-            for (Integer slot : slots) {
+            for (BoxStats stat : stats) {
 
-                int room = mergeRoom(boxes.get(slot), stack);
-
-                if (room > bestRoom) {
-                    mergeTarget = boxes.get(slot);
-                    bestRoom = room;
+                if (stat.mergeRoom() > bestRoom) {
+                    mergeTarget = stat.target();
+                    bestRoom = stat.mergeRoom();
                 }
 
             }
@@ -131,23 +132,18 @@ public final class CollectScan {
 
         }
 
+        // Ярус 2: бокс со свободным слотом, уже хранящий тип
         BoxCollectTarget typeTarget = null;
         int bestAmount = 0;
 
-        for (Integer slot : slots) {
+        for (BoxStats stat : stats) {
 
-            BoxCollectTarget target = boxes.get(slot);
-
-            if (ShulkerUtil.countFreeSlots(contentsOf(target)) <= 0) {
+            if (stat.freeSlots() <= 0 || stat.amount() <= bestAmount) {
                 continue;
             }
 
-            int amount = amountOf(target, stack);
-
-            if (amount > bestAmount) {
-                typeTarget = target;
-                bestAmount = amount;
-            }
+            typeTarget = stat.target();
+            bestAmount = stat.amount();
 
         }
 
@@ -155,14 +151,15 @@ public final class CollectScan {
             return typeTarget;
         }
 
-        boolean typeKnown = configManager.getAutoCollectMode() != CollectMode.MATCHING
-                || holdsType(stack);
+        // Ярус 3: любой бокс со свободным слотом по стратегии fill_order
+        boolean typeKnown = config.getAutoCollectMode() != CollectMode.MATCHING
+                || stats.stream().anyMatch(stat -> stat.amount() > 0);
 
         if (!typeKnown) {
             return null;
         }
 
-        return freeTarget();
+        return freeTarget(stats);
 
     }
 
@@ -171,29 +168,28 @@ public final class CollectScan {
      *
      * @return цель или null, если свободных слотов нет ни в одном боксе
      */
-    private @Nullable BoxCollectTarget freeTarget() {
+    private @Nullable BoxCollectTarget freeTarget(@NotNull List<BoxStats> stats) {
 
-        FillOrderType fillOrder = configManager.getAutoCollectFillOrder();
+        FillOrderType fillOrder = config.getAutoCollectFillOrder();
         BoxCollectTarget best = null;
         int bestScore = 0;
 
-        for (Integer slot : slots) {
+        for (BoxStats stat : stats) {
 
-            BoxCollectTarget target = boxes.get(slot);
-            int freeSlots = ShulkerUtil.countFreeSlots(contentsOf(target));
-
-            if (freeSlots <= 0) {
+            if (stat.freeSlots() <= 0) {
                 continue;
             }
 
             if (fillOrder == FillOrderType.INVENTORY) {
-                return target;
+                return stat.target();
             }
 
-            int score = fillOrder == FillOrderType.BALANCED ? freeSlots : -freeSlots;
+            int score = fillOrder == FillOrderType.BALANCED
+                    ? stat.freeSlots()
+                    : -stat.freeSlots();
 
             if (best == null || score > bestScore) {
-                best = target;
+                best = stat.target();
                 bestScore = score;
             }
 
@@ -209,7 +205,7 @@ public final class CollectScan {
      * на ярусы боксов вместо отказа всего скана.
      */
     private boolean sessionAccepts(@NotNull ItemStack stack) {
-        return configManager.getAutoCollectMode() != CollectMode.MATCHING
+        return config.getAutoCollectMode() != CollectMode.MATCHING
                 || sessionHoldsType(stack);
     }
 
@@ -234,15 +230,10 @@ public final class CollectScan {
             ensureBoxes();
         }
 
-        for (Integer slot : slots) {
-
-            BoxCollectTarget target = boxes.get(slot);
-
-            if (mergeRoom(target, stack) > 0
-                    || ShulkerUtil.countFreeSlots(contentsOf(target)) > 0) {
+        for (BoxStats stat : statsFor(stack)) {
+            if (stat.mergeRoom() > 0 || stat.freeSlots() > 0) {
                 return true;
             }
-
         }
 
         return false;
@@ -254,7 +245,7 @@ public final class CollectScan {
      */
     private boolean sessionHasSpace(@NotNull ItemStack stack) {
 
-        org.bukkit.inventory.Inventory inventory = sessionTarget.getSession().inventory();
+        Inventory inventory = sessionTarget.getSession().inventory();
 
         for (int i = 0; i < inventory.getSize(); i++) {
 
@@ -279,7 +270,7 @@ public final class CollectScan {
      */
     private boolean sessionHoldsType(@NotNull ItemStack stack) {
 
-        org.bukkit.inventory.Inventory inventory = sessionTarget.getSession().inventory();
+        Inventory inventory = sessionTarget.getSession().inventory();
 
         for (int i = 0; i < inventory.getSize(); i++) {
 
@@ -296,70 +287,61 @@ public final class CollectScan {
     }
 
     /**
-     * Известен ли тип предмета какому-либо приемнику скана.
+     * Однократный проход по боксам: вся статистика, нужная ярусам выбора
+     * цели, считается здесь вместо трех отдельных сканирований содержимого.
      */
-    private boolean holdsType(@NotNull ItemStack stack) {
+    private @NotNull List<BoxStats> statsFor(@NotNull ItemStack stack) {
+
+        List<BoxStats> stats = new ArrayList<>(boxes.size());
 
         for (BoxCollectTarget target : boxes.values()) {
-            if (amountOf(target, stack) > 0) {
-                return true;
+
+            ItemStack[] contents = target.workingContents();
+
+            int mergeRoom = 0;
+            int amount = 0;
+            int freeSlots = 0;
+
+            for (ItemStack slot : contents) {
+
+                if (ShulkerUtil.isEmpty(slot)) {
+                    freeSlots++;
+                    continue;
+                }
+
+                if (slot.isSimilar(stack)) {
+
+                    amount += slot.getAmount();
+
+                    if (slot.getAmount() < slot.getMaxStackSize()) {
+                        mergeRoom = Math.max(mergeRoom, slot.getMaxStackSize() - slot.getAmount());
+                    }
+
+                }
+
             }
+
+            stats.add(new BoxStats(target, mergeRoom, amount, freeSlots));
+
         }
 
-        return false;
+        return stats;
 
     }
 
     /**
-     * Сколько предметов того же типа уже хранит бокс (сумма по стекам).
-     */
-    private int amountOf(@NotNull BoxCollectTarget target, @NotNull ItemStack stack) {
-
-        int amount = 0;
-
-        for (ItemStack slot : contentsOf(target)) {
-            if (slot != null && slot.isSimilar(stack)) {
-                amount += slot.getAmount();
-            }
-        }
-
-        return amount;
-
-    }
-
-    /**
-     * Наибольший остаток места в частичном стеке того же типа.
-     *
-     * @return место в предметах или 0, если вливать некуда
-     */
-    private int mergeRoom(@NotNull BoxCollectTarget target, @NotNull ItemStack stack) {
-
-        int room = 0;
-
-        for (ItemStack slot : contentsOf(target)) {
-
-            if (slot == null || !slot.isSimilar(stack) || slot.getAmount() >= slot.getMaxStackSize()) {
-                continue;
-            }
-
-            room = Math.max(room, slot.getMaxStackSize() - slot.getAmount());
-
-        }
-
-        return room;
-
-    }
-
-    /**
-     * Записывает измененные боксы и планирует сохранение сессии; resync клиента - один раз.
+     * Записывает измененные боксы и планирует сохранение сессии;
+     * resync клиента - ровно один на скан (и для боксов, и для GUI).
      */
     public void flush() {
 
-        if (sessionTarget != null && sessionTarget.isUsed()) {
+        boolean sessionUsed = sessionTarget != null && sessionTarget.isUsed();
+
+        if (sessionUsed) {
             persistenceService.scheduleSave(sessionTarget.getSession());
         }
 
-        boolean anyModified = false;
+        boolean anyModified = sessionUsed;
 
         for (BoxCollectTarget target : boxes.values()) {
             if (target.isModified()) {
@@ -379,12 +361,12 @@ public final class CollectScan {
         PlayerInventory inventory = player.getInventory();
         ItemStack[] contents = inventory.getContents();
 
+        // getContents() игрока уже включает хранение, броню и вторую руку
+        // (41 слот, индекс 40 - оффхенд): отдельного добавления оффхенда
+        // не нужно, повторное добавление дублировало бы слот в порядке обхода
         for (int slot = 0; slot < contents.length; slot++) {
             addBox(slot, contents[slot]);
         }
-
-        // Вторая рука - полноценное место для шалкера; слот 40 и так последний
-        addBox(ShulkerUtil.OFF_HAND_SLOT, inventory.getItem(ShulkerUtil.OFF_HAND_SLOT));
 
     }
 
@@ -417,12 +399,18 @@ public final class CollectScan {
         }
 
         boxes.put(slot, new BoxCollectTarget(player, slot, boxContents, transferService));
-        slots.add(slot);
 
     }
 
-    private ItemStack @NotNull [] contentsOf(@NotNull BoxCollectTarget target) {
-        return target.workingContents();
+    /**
+     * Статистика одного бокса для выбора цели.
+     *
+     * @param target    бокс-приемник
+     * @param mergeRoom наибольший остаток места в частичном стеке того же типа
+     * @param amount    сколько предметов того же типа уже хранит бокс
+     * @param freeSlots число пустых слотов
+     */
+    private record BoxStats(BoxCollectTarget target, int mergeRoom, int amount, int freeSlots) {
     }
 
 }

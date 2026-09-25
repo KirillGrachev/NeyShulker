@@ -20,6 +20,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.logging.Handler;
+import java.util.logging.Level;
 import java.util.logging.LogRecord;
 import java.util.logging.Logger;
 
@@ -46,8 +47,28 @@ class ConfigManagerTest {
 
         when(plugin.getDataFolder()).thenReturn(tempDir.toFile());
         when(plugin.getLogger()).thenReturn(countingLogger());
-        when(plugin.getConfig()).thenReturn(new YamlConfiguration());
+        // getConfig перечитывает файл на каждый вызов: reload() менеджера
+        // дергает штатный reloadConfig (мок-noop) и забирает свежий конфиг
+        when(plugin.getConfig()).thenAnswer(answer -> loadFromDisk());
         return plugin;
+
+    }
+
+    /**
+     * Читает config.yml из tempDir без Bukkit-логгера: в тестах сервера нет,
+     * а штатный loadConfiguration при битом YAML полез бы в Bukkit.getLogger().
+     */
+    private YamlConfiguration loadFromDisk() {
+
+        YamlConfiguration loaded = new YamlConfiguration();
+
+        try {
+            loaded.load(tempDir.resolve("config.yml").toFile());
+        } catch (Exception ignored) {
+            // Битый или отсутствующий файл: пустая конфигурация, как в продакшене
+        }
+
+        return loaded;
 
     }
 
@@ -381,6 +402,66 @@ class ConfigManagerTest {
     }
 
     @Test
+    @DisplayName("Режимы игры автосбора читаются, битое имя пропускается")
+    void gameModesAreParsed() throws Exception {
+
+        writeConfig("""
+                settings:
+                  auto_collect:
+                    rules:
+                      gamemodes:
+                        - "SURVIVAL"
+                        - "CREATIVE"
+                        - "NOT_A_MODE"
+                """);
+        ConfigManager config = configManager(plugin());
+
+        assertEquals(java.util.Set.of(org.bukkit.GameMode.SURVIVAL, org.bukkit.GameMode.CREATIVE),
+                config.getAutoCollectGameModes());
+        assertEquals(1, consoleRecords.size(), "Неизвестный режим дает одно предупреждение");
+
+    }
+
+    @Test
+    @DisplayName("Пустая секция gamemodes дает дефолт SURVIVAL+ADVENTURE")
+    void emptyGameModesFallBackToDefault() throws Exception {
+
+        writeConfig("""
+                settings:
+                  auto_collect:
+                    rules:
+                      gamemodes: []
+                """);
+        ConfigManager config = configManager(plugin());
+
+        assertEquals(java.util.Set.of(org.bukkit.GameMode.SURVIVAL, org.bukkit.GameMode.ADVENTURE),
+                config.getAutoCollectGameModes());
+        assertTrue(consoleRecords.isEmpty(), "Пустой список не предупреждает, а берет дефолт");
+
+    }
+
+    @Test
+    @DisplayName("Битый YAML: дефолты работают, ошибка уходит в SEVERE со стектрейсом")
+    void brokenYamlIsReportedLoudly() throws Exception {
+
+        writeConfig("settings: [unclosed\n  broken: :\n");
+
+        ConfigManager config = configManager(plugin());
+
+        // Плагин не падает и работает на дефолтах
+        assertTrue(config.isPluginEnabled());
+        assertEquals(OpenMethodType.AIR, config.getOpenMethod());
+
+        // В логе ровно одна SEVERE-запись с причиной
+        assertEquals(1, consoleRecords.size());
+        LogRecord record = consoleRecords.get(0);
+        assertEquals(Level.SEVERE, record.getLevel());
+        org.junit.jupiter.api.Assertions.assertNotNull(record.getThrown(),
+                "Стектрейс исключения обязателен");
+
+    }
+
+    @Test
     @DisplayName("Имена заголовка читаются по ключам языков")
     void titleNamesReadPerLocale() throws Exception {
 
@@ -397,6 +478,47 @@ class ConfigManagerTest {
         assertEquals("Shulker Box", config.getTitleNames().get("default"));
         assertEquals("Шалкеровый ящик", config.getTitleNames().get("ru_ru"),
                 "Ключи языков приводятся к нижнему регистру");
+
+    }
+
+
+    @Test
+    @DisplayName("Секция sounds читается целиком: имя, enabled, volume, pitch")
+    void soundsSectionIsParsed() throws Exception {
+
+        writeConfig("""
+                sounds:
+                  open:
+                    enabled: false
+                  collect:
+                    sound: ENTITY_EXPERIENCE_ORB_PICKUP
+                    volume: 0.25
+                    pitch: 1.8
+                """);
+        ConfigManager config = configManager(plugin());
+
+        assertFalse(config.getOpenSound().enabled(), "open выключен флагом");
+        assertEquals(Sound.BLOCK_SHULKER_BOX_OPEN, config.getOpenSound().sound());
+
+        assertTrue(config.getCollectSound().enabled());
+        assertEquals(Sound.ENTITY_EXPERIENCE_ORB_PICKUP, config.getCollectSound().sound());
+        assertEquals(0.25f, config.getCollectSound().volume());
+        assertEquals(1.8f, config.getCollectSound().pitch());
+
+        // close без секции - дефолт
+        assertEquals(Sound.BLOCK_SHULKER_BOX_CLOSE, config.getCloseSound().sound());
+
+    }
+
+    @Test
+    @DisplayName("Префикс сообщений красится, отсутствующая секция title.names пуста")
+    void prefixIsColoredAndNamesDefaultEmpty() throws Exception {
+
+        writeConfig("messages:\n  prefix: \"&#ff0000P > \"\n");
+        ConfigManager config = configManager(plugin());
+
+        assertEquals("§x§f§f§0§0§0§0P > ", config.getMessagePrefix());
+        assertTrue(config.getTitleNames().isEmpty());
 
     }
 

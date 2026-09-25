@@ -1,16 +1,16 @@
 package eu.neydev.neyshulker.command;
 
-import eu.neydev.neyshulker.NeyShulker;
-import eu.neydev.neyshulker.ServiceContainer;
 import eu.neydev.neyshulker.config.ConfigManager;
 import eu.neydev.neyshulker.config.type.MessageKey;
 import eu.neydev.neyshulker.config.type.PermissionNode;
 import eu.neydev.neyshulker.model.ShulkerSession;
+import eu.neydev.neyshulker.model.ValidationResult;
 import eu.neydev.neyshulker.registry.SessionRegistry;
 import eu.neydev.neyshulker.service.AutoCollectService;
 import eu.neydev.neyshulker.service.MessageService;
 import eu.neydev.neyshulker.service.PermissionService;
 import eu.neydev.neyshulker.service.ShulkerOpenService;
+import eu.neydev.neyshulker.service.ShulkerValidationService;
 import eu.neydev.neyshulker.util.FakeItemStack;
 import eu.neydev.neyshulker.util.TestInventories;
 import org.bukkit.Material;
@@ -47,6 +47,7 @@ class ShulkerCommandTest {
     private final PermissionService permissionService = mock(PermissionService.class);
     private final MessageService messageService = mock(MessageService.class);
     private final ShulkerOpenService openService = mock(ShulkerOpenService.class);
+    private final ShulkerValidationService validationService = mock(ShulkerValidationService.class);
     private final AutoCollectService autoCollectService = mock(AutoCollectService.class);
     private final SessionRegistry sessionRegistry = mock(SessionRegistry.class);
 
@@ -61,20 +62,12 @@ class ShulkerCommandTest {
 
     private ShulkerCommand commandExecutor() {
 
-        ServiceContainer container = mock(ServiceContainer.class);
-        NeyShulker plugin = mock(NeyShulker.class);
-
-        when(container.getConfigManager()).thenReturn(configManager);
-        when(container.getPermissionService()).thenReturn(permissionService);
-        when(container.getMessageService()).thenReturn(messageService);
-        when(container.getOpenService()).thenReturn(openService);
-        when(container.getAutoCollectService()).thenReturn(autoCollectService);
-        when(container.getSessionRegistry()).thenReturn(sessionRegistry);
-        when(plugin.getServices()).thenReturn(container);
-        when(plugin.getConfigManager()).thenReturn(configManager);
-
         when(player.getInventory()).thenReturn(inventory);
-        return new ShulkerCommand(plugin);
+        // Командный путь валидации по умолчанию разрешен
+        when(validationService.canOpenViaCommand(eq(player), any()))
+                .thenReturn(ValidationResult.allowed());
+        return new ShulkerCommand(configManager, permissionService, messageService,
+                openService, validationService, autoCollectService, sessionRegistry);
 
     }
 
@@ -205,12 +198,117 @@ class ShulkerCommandTest {
     @DisplayName("Tab-completer предлагает подкоманды по префиксу")
     void tabCompletesSubcommands() {
 
+        when(permissionService.has((org.bukkit.command.CommandSender) player, PermissionNode.RELOAD))
+                .thenReturn(true);
+
         List<String> all = commandExecutor().onTabComplete(player, command, "shulker", new String[]{""});
         assertEquals(List.of("reload", "open", "info", "autocollect"), all);
         List<String> filtered = commandExecutor().onTabComplete(player, command, "shulker", new String[]{"au"});
 
         assertTrue(filtered.contains("autocollect"));
         assertEquals(1, filtered.size());
+
+    }
+
+    @Test
+    @DisplayName("Tab-completer прячет reload без права")
+    void tabCompleteHidesReloadWithoutPermission() {
+
+        when(permissionService.has((org.bukkit.command.CommandSender) player, PermissionNode.RELOAD))
+                .thenReturn(false);
+
+        List<String> all = commandExecutor().onTabComplete(player, command, "shulker", new String[]{""});
+        assertEquals(List.of("open", "info", "autocollect"), all);
+
+    }
+
+    @Test
+    @DisplayName("open не открывает бокс, отклоненный валидацией (черный список)")
+    void openRespectsCommandValidation() {
+
+        when(permissionService.has(player, PermissionNode.USE)).thenReturn(true);
+        FakeItemStack shulker = new FakeItemStack(Material.WHITE_SHULKER_BOX, 1);
+        inventory.setItem(0, shulker);
+        when(player.getInventory().getHeldItemSlot()).thenReturn(0);
+
+        ShulkerCommand executor = commandExecutor();
+
+        // Точечный стаб регистрируется ПОСЛЕ общего из commandExecutor():
+        // у Mockito последний подходящий стаб побеждает
+        when(validationService.canOpenViaCommand(player, shulker))
+                .thenReturn(ValidationResult.denied(
+                        eu.neydev.neyshulker.config.type.ValidationReason.BLACKLISTED));
+
+        executor.onCommand(player, command, "shulker", new String[]{"open"});
+
+        verify(messageService).send(player, MessageKey.BLACKLISTED);
+        verify(openService, never()).open(any(), any(), anyInt());
+
+    }
+
+
+    @Test
+    @DisplayName("Игровые подкоманды из консоли отвечают PLAYER_ONLY")
+    void playerOnlyBranchesFromConsole() {
+
+        org.bukkit.command.CommandSender console = mock(org.bukkit.command.CommandSender.class);
+
+        ShulkerCommand executor = commandExecutor();
+
+        executor.onCommand(console, command, "shulker", new String[]{"open"});
+        executor.onCommand(console, command, "shulker", new String[]{"info"});
+        executor.onCommand(console, command, "shulker", new String[]{"autocollect"});
+
+        verify(messageService, org.mockito.Mockito.times(3))
+                .send(console, MessageKey.PLAYER_ONLY, Map.of());
+
+    }
+
+    @Test
+    @DisplayName("Неизвестная подкоманда печатает справку")
+    void unknownSubcommandPrintsUsage() {
+
+        commandExecutor().onCommand(player, command, "shulker", new String[]{"teleport"});
+
+        verify(messageService)
+                .send((org.bukkit.command.CommandSender) player, MessageKey.USAGE, Map.of());
+
+    }
+
+    @Test
+    @DisplayName("autocollect без права отклоняется")
+    void autocollectRespectsPermission() {
+
+        when(permissionService.has(player, PermissionNode.AUTO_COLLECT)).thenReturn(false);
+
+        commandExecutor().onCommand(player, command, "shulker", new String[]{"autocollect"});
+
+        verify(messageService).send(player, MessageKey.NO_PERMISSION);
+        verify(autoCollectService, never()).toggle(player);
+
+    }
+
+    @Test
+    @DisplayName("Tab-completer на втором аргументе пуст")
+    void tabCompleteSecondArgumentIsEmpty() {
+
+        List<String> none = commandExecutor()
+                .onTabComplete(player, command, "shulker", new String[]{"info", ""});
+
+        assertTrue(none.isEmpty());
+
+    }
+
+    @Test
+    @DisplayName("open без права не открывается")
+    void openRespectsPermission() {
+
+        when(permissionService.has(player, PermissionNode.USE)).thenReturn(false);
+
+        commandExecutor().onCommand(player, command, "shulker", new String[]{"open"});
+
+        verify(messageService).send(player, MessageKey.NO_PERMISSION);
+        verify(openService, never()).open(any(), any(), anyInt());
 
     }
 

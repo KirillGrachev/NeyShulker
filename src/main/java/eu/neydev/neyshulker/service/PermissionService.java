@@ -1,6 +1,6 @@
 package eu.neydev.neyshulker.service;
 
-import eu.neydev.neyshulker.config.ConfigManager;
+import eu.neydev.neyshulker.config.NeyShulkerConfig;
 import eu.neydev.neyshulker.config.type.PermissionNode;
 import org.bukkit.command.CommandSender;
 import org.bukkit.command.ConsoleCommandSender;
@@ -14,19 +14,12 @@ import org.jetbrains.annotations.Nullable;
  */
 public class PermissionService {
 
-    private final ConfigManager configManager;
+    private final NeyShulkerConfig config;
 
-    public PermissionService(ConfigManager configManager) {
-        this.configManager = configManager;
+    public PermissionService(@NotNull NeyShulkerConfig config) {
+        this.config = config;
     }
 
-    /**
-     * Проверяет наличие права у игрока.
-     *
-     * @param player проверяемый игрок
-     * @param node   узел права
-     * @return true если действие разрешено
-     */
     /**
      * Проверяет наличие права у игрока.
      *
@@ -47,7 +40,7 @@ public class PermissionService {
      */
     public boolean has(@Nullable CommandSender sender, @NotNull PermissionNode node) {
 
-        if (!configManager.arePermissionsEnabled()) {
+        if (!config.arePermissionsEnabled()) {
             return true;
         }
 
@@ -55,12 +48,11 @@ public class PermissionService {
             return false;
         }
 
-        if (configManager.isPermissionOpBypass()
-                && (sender.isOp() || sender instanceof ConsoleCommandSender)) {
+        if (isOpBypass(sender)) {
             return true;
         }
 
-        return sender.hasPermission(configManager.getPermission(node));
+        return sender.hasPermission(config.getPermission(node));
 
     }
 
@@ -72,9 +64,11 @@ public class PermissionService {
      * @return true если проверки прав для него не действуют
      */
     private boolean isOpBypass(@Nullable CommandSender sender) {
-        return configManager.isPermissionOpBypass()
+
+        return config.isPermissionOpBypass()
                 && sender != null
                 && (sender.isOp() || sender instanceof ConsoleCommandSender);
+
     }
 
     /**
@@ -89,7 +83,7 @@ public class PermissionService {
      */
     public boolean canBypassBlacklist(@Nullable Player player) {
 
-        if (!configManager.arePermissionsEnabled()) {
+        if (!config.arePermissionsEnabled()) {
             return false;
         }
 
@@ -98,7 +92,7 @@ public class PermissionService {
         }
 
         return player != null
-                && player.hasPermission(configManager.getPermission(PermissionNode.BYPASS_BLACKLIST));
+                && player.hasPermission(config.getPermission(PermissionNode.BYPASS_BLACKLIST));
 
     }
 

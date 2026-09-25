@@ -1,7 +1,6 @@
 package eu.neydev.neyshulker.listener;
 
 import eu.neydev.neyshulker.NeyShulker;
-import eu.neydev.neyshulker.ServiceContainer;
 import eu.neydev.neyshulker.config.ConfigManager;
 import eu.neydev.neyshulker.config.type.MessageKey;
 import eu.neydev.neyshulker.config.type.ValidationReason;
@@ -44,6 +43,7 @@ class PlayerInteractListenerTest {
     private final MessageService messageService = mock(MessageService.class);
     private final eu.neydev.neyshulker.registry.SessionRegistry sessionRegistry =
             mock(eu.neydev.neyshulker.registry.SessionRegistry.class);
+    private final NeyShulker plugin = mock(NeyShulker.class);
 
     private final Player player = mock(Player.class);
     private final PlayerInventory inventory = TestInventories.playerInventory();
@@ -55,20 +55,11 @@ class PlayerInteractListenerTest {
 
     private PlayerInteractListener listener() {
 
-        ServiceContainer container = mock(ServiceContainer.class);
-        NeyShulker plugin = mock(NeyShulker.class);
-
-        when(container.getConfigManager()).thenReturn(configManager);
-        when(container.getValidationService()).thenReturn(validationService);
-        when(container.getOpenService()).thenReturn(openService);
-        when(container.getMessageService()).thenReturn(messageService);
-        when(container.getSessionRegistry()).thenReturn(sessionRegistry);
-        when(plugin.getServices()).thenReturn(container);
-
         when(configManager.isPluginEnabled()).thenReturn(true);
         when(player.getInventory()).thenReturn(inventory);
         when(player.getItemOnCursor()).thenReturn(null);
-        return new PlayerInteractListener(plugin);
+        return new PlayerInteractListener(plugin, configManager, validationService,
+                openService, messageService, sessionRegistry);
 
     }
 
@@ -141,7 +132,6 @@ class PlayerInteractListenerTest {
                 .thenReturn(ValidationResult.allowed());
 
         BukkitScheduler scheduler = mock(BukkitScheduler.class);
-        NeyShulker plugin = mock(NeyShulker.class);
 
         try (MockedStatic<Bukkit> bukkit = mockStatic(Bukkit.class)) {
 

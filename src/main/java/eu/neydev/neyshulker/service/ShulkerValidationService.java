@@ -1,11 +1,12 @@
 package eu.neydev.neyshulker.service;
 
-import eu.neydev.neyshulker.config.ConfigManager;
+import eu.neydev.neyshulker.config.NeyShulkerConfig;
 import eu.neydev.neyshulker.config.type.PermissionNode;
 import eu.neydev.neyshulker.config.type.ValidationReason;
 import eu.neydev.neyshulker.model.ShulkerSession;
 import eu.neydev.neyshulker.model.ValidationResult;
 import eu.neydev.neyshulker.registry.SessionRegistry;
+import eu.neydev.neyshulker.util.SessionTagger;
 import eu.neydev.neyshulker.util.ShulkerUtil;
 import org.bukkit.entity.Player;
 import org.bukkit.event.block.Action;
@@ -17,18 +18,24 @@ import org.jetbrains.annotations.Nullable;
 /**
  * Сервис всех проверок плагина: открытие, вложение предметов, защита открытого шалкера.
  * Не отправляет сообщения и не меняет состояние - только принимает решение.
+ *
+ * Идентификация открытого бокса идет по метке сессии в PersistentDataContainer
+ * предмета (см. {@link SessionTagger}): сравнение меты со слепком открытия
+ * переставало работать после первого же автосохранения, а сравнение материала
+ * не отличало бокс-близнец. Legacy-проверки по слоту остаются только для
+ * немеченых предметов (тестовые заглушки без ItemMeta).
  */
 public class ShulkerValidationService {
 
-    private final ConfigManager configManager;
+    private final NeyShulkerConfig config;
     private final PermissionService permissionService;
     private final SessionRegistry sessionRegistry;
 
-    public ShulkerValidationService(@NotNull ConfigManager configManager,
+    public ShulkerValidationService(@NotNull NeyShulkerConfig config,
                                     @NotNull PermissionService permissionService,
                                     @NotNull SessionRegistry sessionRegistry) {
 
-        this.configManager = configManager;
+        this.config = config;
         this.permissionService = permissionService;
         this.sessionRegistry = sessionRegistry;
 
@@ -46,7 +53,38 @@ public class ShulkerValidationService {
                                              @Nullable ItemStack item,
                                              @NotNull Action action) {
 
-        if (!configManager.isPluginEnabled()) {
+        ValidationResult common = canOpenCommon(player, item);
+
+        if (!common.isAllowed()) {
+            return common;
+        }
+
+        if (!matchesOpenMethod(player, action)) {
+            return ValidationResult.denied(ValidationReason.METHOD_MISMATCH);
+        }
+
+        return ValidationResult.allowed();
+
+    }
+
+    /**
+     * Проверяет открытие шалкер-бокса командой: мастер-выключатель, права
+     * и черный список, но без проверки способа открытия (команда - явное
+     * намерение, open_method к ней неприменим).
+     *
+     * @param player игрок
+     * @param item   предмет в руке
+     * @return результат проверки
+     */
+    public @NotNull ValidationResult canOpenViaCommand(@NotNull Player player,
+                                                       @Nullable ItemStack item) {
+        return canOpenCommon(player, item);
+    }
+
+    private @NotNull ValidationResult canOpenCommon(@NotNull Player player,
+                                                    @Nullable ItemStack item) {
+
+        if (!config.isPluginEnabled()) {
             return ValidationResult.denied(ValidationReason.PLUGIN_DISABLED);
         }
 
@@ -62,10 +100,6 @@ public class ShulkerValidationService {
             return ValidationResult.denied(ValidationReason.BLACKLISTED);
         }
 
-        if (!matchesOpenMethod(player, action)) {
-            return ValidationResult.denied(ValidationReason.METHOD_MISMATCH);
-        }
-
         return ValidationResult.allowed();
 
     }
@@ -73,8 +107,8 @@ public class ShulkerValidationService {
     /**
      * Проверяет, можно ли положить предмет в шалкер-бокс.
      *
-     * @param player игрок
-     * @param item   проверяемый предмет
+     * @param player       игрок
+     * @param item         проверяемый предмет
      * @return результат проверки
      */
     public @NotNull ValidationResult canEnterShulker(@NotNull Player player,
@@ -86,10 +120,8 @@ public class ShulkerValidationService {
 
         if (ShulkerUtil.isShulkerBox(item)) {
 
-            ShulkerSession session = sessionRegistry.getSession(player);
-
             // Сам открытый шалкер-бокс нельзя никуда перекладывать
-            if (session != null && item.isSimilar(session.shulkerItem())) {
+            if (isOpenShulker(player, item)) {
                 return ValidationResult.denied(ValidationReason.OPEN_SHULKER);
             }
 
@@ -122,16 +154,28 @@ public class ShulkerValidationService {
         }
 
         ShulkerSession session = sessionRegistry.getSession(player);
-        return session != null && item.isSimilar(session.shulkerItem());
+
+        if (session == null) {
+            return false;
+        }
+
+        // Метка сессии не устаревает: автосохранения переносят ее вместе с метой
+        if (SessionTagger.isSession(item, session.sessionId())) {
+            return true;
+        }
+
+        // Legacy-ветка для немеченых предметов (слепок сессии без ItemMeta)
+        return SessionTagger.sessionIdOf(session.shulkerItem()) == null
+                && item.isSimilar(session.shulkerItem());
 
     }
 
     /**
      * Проверяет, пытается ли игрок выбросить или обменять открытый шалкер-бокс.
      *
-     * Опознавание идет по слоту сессии и типу материала, а не по isSimilar:
-     * сохранения перезаписывают содержимое предмета, и сравнение меты
-     * переставало узнавать собственный бокс - на этом строился дюп через Q.
+     * Опознавание идет по слоту сессии и типу материала: сохранения
+     * перезаписывают содержимое предмета, и сравнение меты переставало
+     * узнавать собственный бокс - на этом строился дюп через Q.
      *
      * @param player игрок
      * @return true если в руке игрока лежит открытый шалкер-бокс
@@ -157,11 +201,10 @@ public class ShulkerValidationService {
     /**
      * Проверяет, является ли выброшенный предмет самим открытым боксом.
      *
-     * Сравнение идет с живым стеком слота сессии, а не со слепком открытия:
-     * автосохранения перезаписывают мету, и слепок переставал узнавать бокс.
-     * Ваниль не может выбросить бокс мимо кликовых проверок (слот заблокирован
-     * на уровне InventoryClickEvent), поэтому сюда доходят только выбросы
-     * чужими путями - командами и сторонними плагинами.
+     * Основной критерий - метка сессии на самом выброшенном предмете:
+     * она не зависит от слота и переживает любые перемещения бокса.
+     * Legacy-ветка (немеченые предметы) сверяется с живым стеком слота
+     * сессии, а не со слепком открытия.
      *
      * @param player игрок
      * @param item   выброшенный предмет
@@ -176,6 +219,15 @@ public class ShulkerValidationService {
         ShulkerSession session = sessionRegistry.getSession(player);
 
         if (session == null) {
+            return false;
+        }
+
+        if (SessionTagger.isSession(item, session.sessionId())) {
+            return true;
+        }
+
+        if (SessionTagger.sessionIdOf(session.shulkerItem()) != null) {
+            // Сессия меченая, а на выброшенном предмете метки нет - это не наш бокс
             return false;
         }
 
@@ -223,11 +275,11 @@ public class ShulkerValidationService {
 
     private boolean isBlacklistedFor(@NotNull Player player, @Nullable ItemStack item) {
 
-        if (item == null || !configManager.isBlacklistEnabled()) {
+        if (item == null || !config.isBlacklistEnabled()) {
             return false;
         }
 
-        return configManager.isBlacklisted(item.getType())
+        return config.isBlacklisted(item.getType())
                 && !permissionService.canBypassBlacklist(player);
 
     }
@@ -243,7 +295,7 @@ public class ShulkerValidationService {
         boolean sneaking = player.isSneaking();
         boolean rightClickAir = action == Action.RIGHT_CLICK_AIR;
 
-        return switch (configManager.getOpenMethod()) {
+        return switch (config.getOpenMethod()) {
 
             // По воздуху нет ванильного взаимодействия - открытие ничего не крадет
             case AIR -> rightClickAir;

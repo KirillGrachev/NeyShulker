@@ -9,6 +9,9 @@ import eu.neydev.neyshulker.service.collect.PlayerDropTracker;
 import eu.neydev.neyshulker.util.FakeItemStack;
 import eu.neydev.neyshulker.util.ShulkerUtil;
 import eu.neydev.neyshulker.util.TestInventories;
+import eu.neydev.neyshulker.service.collect.CollectRules;
+import eu.neydev.neyshulker.service.collect.NearbyItemsFinder;
+import static org.mockito.ArgumentMatchers.anyDouble;
 import org.bukkit.Bukkit;
 import org.bukkit.GameMode;
 import org.bukkit.Location;
@@ -79,7 +82,8 @@ class AutoCollectWaveTest {
         Location playerLocation = mock(Location.class);
         World world = mock(World.class);
 
-        when(world.getEntitiesByClass(Item.class)).thenReturn(List.of(drops));
+        when(world.getNearbyEntities(any(Location.class), anyDouble(), anyDouble(), anyDouble(), any()))
+                .thenReturn(List.of(drops));
         when(player.getWorld()).thenReturn(world);
         when(player.getLocation()).thenReturn(playerLocation);
         when(player.isOnline()).thenReturn(true);
@@ -179,7 +183,9 @@ class AutoCollectWaveTest {
 
         return new AutoCollectService(plugin, configManager, sessionRegistry,
                 new InventoryTransferService(), persistenceService,
-                messageService, soundService, permissionService, dropTracker);
+                messageService, soundService,
+                new CollectRules(configManager, permissionService, dropTracker),
+                new NearbyItemsFinder(configManager), dropTracker);
 
     }
 
@@ -216,14 +222,14 @@ class AutoCollectWaveTest {
 
             service.wave();
 
-            verify(first.world()).getEntitiesByClass(Item.class);
-            verify(second.world(), never()).getEntitiesByClass(Item.class);
+            verify(first.world()).getNearbyEntities(any(Location.class), anyDouble(), anyDouble(), anyDouble(), any());
+            verify(second.world(), never()).getNearbyEntities(any(Location.class), anyDouble(), anyDouble(), anyDouble(), any());
             verify(dropA).remove();
             verify(dropB, never()).remove();
 
             service.wave();
 
-            verify(second.world()).getEntitiesByClass(Item.class);
+            verify(second.world()).getNearbyEntities(any(Location.class), anyDouble(), anyDouble(), anyDouble(), any());
             verify(dropB).remove();
 
         }

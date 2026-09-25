@@ -4,6 +4,8 @@ import eu.neydev.neyshulker.config.ConfigManager;
 import eu.neydev.neyshulker.service.ConsoleService;
 import eu.neydev.neyshulker.registry.SessionRegistry;
 import eu.neydev.neyshulker.service.AutoCollectService;
+import eu.neydev.neyshulker.service.collect.CollectRules;
+import eu.neydev.neyshulker.service.collect.NearbyItemsFinder;
 import eu.neydev.neyshulker.service.collect.PlayerDropTracker;
 import eu.neydev.neyshulker.service.InventoryTransferService;
 import eu.neydev.neyshulker.service.MessageService;
@@ -19,7 +21,11 @@ import eu.neydev.neyshulker.service.SoundService;
 
 /**
  * Контейнер компонентов плагина.
- * Порядок создания зафиксирован: каждый сервис получает уже готовые зависимости.
+ * Порядок создания зафиксирован: каждый сервис получает уже готовые
+ * зависимости. Контейнер собирает граф полностью - включая механику
+ * автосбора (CollectRules, NearbyItemsFinder) и подписку автосбора
+ * на reload конфигурации, - чтобы ни один компонент не создавал
+ * зависимости себе сам и не подписывался из собственного конструктора.
  */
 public final class ServiceContainer {
 
@@ -40,6 +46,8 @@ public final class ServiceContainer {
     private final ShulkerCloseService closeService;
     private final ShulkerTransferService transferService;
     private final PlayerDropTracker dropTracker;
+    private final CollectRules collectRules;
+    private final NearbyItemsFinder nearbyItemsFinder;
     private final AutoCollectService autoCollectService;
 
     public ServiceContainer(NeyShulker plugin, ConfigManager configManager,
@@ -71,11 +79,17 @@ public final class ServiceContainer {
                 persistenceService, soundService);
         this.transferService = new ShulkerTransferService(sessionRegistry, persistenceService);
 
-        // Фоновые задачи
+        // Механика и фоновые задачи автосбора
         this.dropTracker = new PlayerDropTracker(System::currentTimeMillis);
+        this.collectRules = new CollectRules(configManager, permissionService, dropTracker);
+        this.nearbyItemsFinder = new NearbyItemsFinder(configManager);
         this.autoCollectService = new AutoCollectService(plugin, configManager, sessionRegistry,
                 inventoryTransferService, persistenceService, messageService, soundService,
-                permissionService, dropTracker);
+                collectRules, nearbyItemsFinder, dropTracker);
+
+        // Подписка на reload конфигурации - здесь, а не в конструкторе сервиса:
+        // сервис не должен публиковать this до завершения собственного создания
+        configManager.onReload(autoCollectService::restart);
 
     }
 
@@ -145,6 +159,14 @@ public final class ServiceContainer {
 
     public PlayerDropTracker getDropTracker() {
         return dropTracker;
+    }
+
+    public CollectRules getCollectRules() {
+        return collectRules;
+    }
+
+    public NearbyItemsFinder getNearbyItemsFinder() {
+        return nearbyItemsFinder;
     }
 
 }

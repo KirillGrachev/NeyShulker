@@ -1,6 +1,5 @@
 package eu.neydev.neyshulker.listener;
 
-import eu.neydev.neyshulker.NeyShulker;
 import eu.neydev.neyshulker.service.AutoCollectService;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
@@ -34,8 +33,8 @@ public class WaitListSyncListener implements Listener {
 
     private final AutoCollectService autoCollectService;
 
-    public WaitListSyncListener(@NotNull NeyShulker plugin) {
-        this.autoCollectService = plugin.getServices().getAutoCollectService();
+    public WaitListSyncListener(@NotNull AutoCollectService autoCollectService) {
+        this.autoCollectService = autoCollectService;
     }
 
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = false)

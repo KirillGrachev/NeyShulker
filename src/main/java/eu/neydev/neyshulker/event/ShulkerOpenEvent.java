@@ -1,6 +1,5 @@
 package eu.neydev.neyshulker.event;
 
-import eu.neydev.neyshulker.model.ShulkerSession;
 import org.bukkit.entity.Player;
 import org.bukkit.event.Cancellable;
 import org.bukkit.event.HandlerList;
@@ -9,25 +8,28 @@ import org.jetbrains.annotations.NotNull;
 
 /**
  * Вызывается до открытия GUI шалкер-бокса.
- * Отмена события предотвращает открытие.
+ * Отмена события предотвращает открытие: GUI игроку не показывается.
+ *
+ * Событие намеренно не отдает внутреннюю сессию плагина: потребителям
+ * доступна неизменяемая проекция (игрок, слепок предмета, слот).
  */
 public class ShulkerOpenEvent extends NeyShulkerEvent implements Cancellable {
 
     private static final HandlerList HANDLERS = new HandlerList();
 
     private final Player player;
-    private final ShulkerSession session;
     private final ItemStack shulkerItem;
+    private final int slot;
 
     private boolean cancelled;
 
     public ShulkerOpenEvent(@NotNull Player player,
-                            @NotNull ShulkerSession session,
-                            @NotNull ItemStack shulkerItem) {
+                            @NotNull ItemStack shulkerItem,
+                            int slot) {
 
         this.player = player;
-        this.session = session;
-        this.shulkerItem = shulkerItem;
+        this.shulkerItem = shulkerItem.clone();
+        this.slot = slot;
 
     }
 
@@ -35,12 +37,18 @@ public class ShulkerOpenEvent extends NeyShulkerEvent implements Cancellable {
         return player;
     }
 
-    public @NotNull ShulkerSession getSession() {
-        return session;
-    }
-
+    /**
+     * @return слепок предмета шалкер-бокса, который открывается
+     */
     public @NotNull ItemStack getShulkerItem() {
         return shulkerItem.clone();
+    }
+
+    /**
+     * @return слот инвентаря игрока, в котором лежит бокс
+     */
+    public int getSlot() {
+        return slot;
     }
 
     @Override

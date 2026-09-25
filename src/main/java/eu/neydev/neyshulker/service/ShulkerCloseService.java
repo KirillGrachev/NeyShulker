@@ -5,6 +5,7 @@ import eu.neydev.neyshulker.event.ShulkerCloseEvent;
 import eu.neydev.neyshulker.model.ShulkerSession;
 import eu.neydev.neyshulker.registry.SessionRegistry;
 import org.bukkit.entity.Player;
+import org.bukkit.inventory.ItemStack;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -12,6 +13,8 @@ import org.jetbrains.annotations.Nullable;
  * Сервис закрытия шалкер-бокса.
  * Порядок операций фиксирован: сначала сохраняем содержимое в предмет,
  * затем снимаем сессию и только после этого уведомляем остальных.
+ * Событие закрытия получает фактический предмет после сохранения,
+ * а не слепок открытия.
  */
 public class ShulkerCloseService {
 
@@ -69,9 +72,11 @@ public class ShulkerCloseService {
         persistenceService.cancelAutoSave(session);
         persistenceService.persist(session, false);
 
+        ItemStack saved = persistenceService.finalizeSession(session);
+
         sessionRegistry.closeSession(player.getUniqueId());
 
-        callCloseEvent(player, session);
+        callCloseEvent(player, session, saved);
         soundService.playClose(player);
         return true;
 
@@ -106,9 +111,13 @@ public class ShulkerCloseService {
 
     }
 
-    private void callCloseEvent(@NotNull Player player, @NotNull ShulkerSession session) {
+    private void callCloseEvent(@NotNull Player player,
+                                @NotNull ShulkerSession session,
+                                @NotNull ItemStack saved) {
+
         plugin.getServer().getPluginManager().callEvent(
-                new ShulkerCloseEvent(player, session, session.shulkerItem()));
+                new ShulkerCloseEvent(player, saved, session.getSlot()));
+
     }
 
 }

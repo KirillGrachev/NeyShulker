@@ -5,6 +5,7 @@ import org.bukkit.Material;
 import org.bukkit.inventory.ItemStack;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.RepeatedTest;
+import org.junit.jupiter.api.RepetitionInfo;
 import org.junit.jupiter.api.Test;
 
 import java.util.Random;
@@ -155,9 +156,12 @@ class ItemStackTransactionTest {
 
     @RepeatedTest(200)
     @DisplayName("Фазовый инвариант: предметы не появляются из воздуха и не исчезают")
-    void insertNeverCreatesOrLosesItems() {
+    void insertNeverCreatesOrLosesItems(RepetitionInfo repetition) {
 
-        Random random = new Random();
+        // Сид = номер повторения: упавшую итерацию можно воспроизвести
+        // точным прогоном @RepeatedTest с тем же индексом
+        long seed = repetition.getCurrentRepetition();
+        Random random = new Random(seed);
         ItemStack[] slots = new ItemStack[5];
 
         int initialTotal = 0;
@@ -190,15 +194,17 @@ class ItemStackTransactionTest {
             }
         }
 
-        assertEquals(initialTotal + incomingAmount, finalTotal, "Нарушен баланс предметов");
+        assertEquals(initialTotal + incomingAmount, finalTotal,
+                "Нарушен баланс предметов (seed=" + seed + ")");
 
     }
 
     @RepeatedTest(200)
     @DisplayName("Фазовый инвариант переноса между слотами")
-    void moveNeverCreatesOrLosesItems() {
+    void moveNeverCreatesOrLosesItems(RepetitionInfo repetition) {
 
-        Random random = new Random();
+        long seed = repetition.getCurrentRepetition();
+        Random random = new Random(seed);
 
         int maxStack = random.nextBoolean() ? 64 : 16;
         int sourceAmount = 1 + random.nextInt(maxStack);
@@ -214,7 +220,8 @@ class ItemStackTransactionTest {
         // transferred - это часть итогового стека назначения, отдельно его не считаем
         int total = amountOf(result.source()) + amountOf(result.destination());
 
-        assertEquals(sourceAmount + destinationAmount, total, "Нарушен баланс предметов");
+        assertEquals(sourceAmount + destinationAmount, total,
+                "Нарушен баланс предметов (seed=" + seed + ")");
         assertTrue(result.transferred() <= sourceAmount, "Перемещено больше, чем было");
         assertTrue(amountOf(result.source()) <= maxStack, "Источник превышает размер стека");
         assertTrue(amountOf(result.destination()) <= maxStack, "Назначение превышает размер стека");

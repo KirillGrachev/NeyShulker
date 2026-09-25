@@ -311,4 +311,108 @@ class ShulkerValidationServiceTest {
 
     }
 
+
+    /**
+     * Предмет с рабочей меткой сессии (PDC-цепочка meta -> container).
+     */
+    private ItemStack taggedItem(UUID sessionId) {
+
+        ItemStack item = mock(ItemStack.class);
+        org.bukkit.inventory.meta.ItemMeta meta = mock(org.bukkit.inventory.meta.ItemMeta.class);
+        org.bukkit.persistence.PersistentDataContainer pdc =
+                mock(org.bukkit.persistence.PersistentDataContainer.class);
+
+        when(item.getType()).thenReturn(Material.WHITE_SHULKER_BOX);
+        when(item.clone()).thenAnswer(answer -> item);
+        when(item.getItemMeta()).thenReturn(meta);
+        when(meta.getPersistentDataContainer()).thenReturn(pdc);
+        when(pdc.get(org.mockito.ArgumentMatchers.any(org.bukkit.NamespacedKey.class),
+                org.mockito.ArgumentMatchers.eq(org.bukkit.persistence.PersistentDataType.STRING)))
+                .thenReturn(sessionId == null ? null : sessionId.toString());
+
+        return item;
+
+    }
+
+    @Test
+    @DisplayName("canOpenViaCommand: те же гейты без проверки способа открытия")
+    void commandValidationBranches() {
+
+        when(configManager.isPluginEnabled()).thenReturn(false);
+        assertEquals(ValidationReason.PLUGIN_DISABLED,
+                validationService.canOpenViaCommand(player, shulker()).reason());
+
+        when(configManager.isPluginEnabled()).thenReturn(true);
+        assertEquals(ValidationReason.NOT_SHULKER,
+                validationService.canOpenViaCommand(player,
+                        new FakeItemStack(Material.STONE, 1)).reason());
+
+        when(permissionService.has(player, PermissionNode.USE)).thenReturn(false);
+        assertEquals(ValidationReason.NO_PERMISSION,
+                validationService.canOpenViaCommand(player, shulker()).reason());
+
+        when(permissionService.has(player, PermissionNode.USE)).thenReturn(true);
+        when(configManager.isBlacklistEnabled()).thenReturn(true);
+        when(configManager.isBlacklisted(Material.WHITE_SHULKER_BOX)).thenReturn(true);
+        when(permissionService.canBypassBlacklist(player)).thenReturn(false);
+        assertEquals(ValidationReason.BLACKLISTED,
+                validationService.canOpenViaCommand(player, shulker()).reason());
+
+        when(permissionService.canBypassBlacklist(player)).thenReturn(true);
+        assertTrue(validationService.canOpenViaCommand(player, shulker()).isAllowed(),
+                "Способ открытия командой не проверяется");
+
+    }
+
+    @Test
+    @DisplayName("Меченый бокс опознается меткой, а не мета-слепком")
+    void taggedBoxRecognizedByTag() {
+
+        UUID sessionId = UUID.randomUUID();
+        ItemStack tagged = taggedItem(sessionId);
+
+        ShulkerSession session = ShulkerSession.create(sessionId, player, tagged,
+                () -> TestInventories.inventory(27), 4);
+
+        when(sessionRegistry.getSession(player)).thenReturn(session);
+
+        assertTrue(validationService.isOpenShulker(player, taggedItem(sessionId)),
+                "Любой предмет с меткой сессии - открытый бокс");
+
+        assertTrue(validationService.isDroppedOpenShulker(player, taggedItem(sessionId)),
+                "Выброшенный меченый бокс опознается без сверки слота");
+
+        assertEquals(ValidationReason.OPEN_SHULKER,
+                validationService.canEnterShulker(player, taggedItem(sessionId)).reason());
+
+    }
+
+    @Test
+    @DisplayName("Немеченый близнец при меченой сессии открытым боксом не считается")
+    void untaggedTwinIsNotOpenBox() {
+
+        UUID sessionId = UUID.randomUUID();
+        ItemStack tagged = taggedItem(sessionId);
+
+        ShulkerSession session = ShulkerSession.create(sessionId, player, tagged,
+                () -> TestInventories.inventory(27), 4);
+
+        when(sessionRegistry.getSession(player)).thenReturn(session);
+
+        PlayerInventory inventory = TestInventories.playerInventory();
+        when(player.getInventory()).thenReturn(inventory);
+        inventory.setItem(4, taggedItem(sessionId));
+
+        // Близнец того же материала без метки: сессия меченая, значит это не наш бокс
+        assertFalse(validationService.isDroppedOpenShulker(player,
+                new FakeItemStack(Material.WHITE_SHULKER_BOX, 1)));
+        assertFalse(validationService.isOpenShulker(player,
+                new FakeItemStack(Material.WHITE_SHULKER_BOX, 1)));
+
+        assertEquals(ValidationReason.NESTED_SHULKER,
+                validationService.canEnterShulker(player,
+                        new FakeItemStack(Material.WHITE_SHULKER_BOX, 1)).reason());
+
+    }
+
 }

@@ -1,10 +1,11 @@
 package eu.neydev.neyshulker.service;
 
 import eu.neydev.neyshulker.NeyShulker;
-import eu.neydev.neyshulker.config.ConfigManager;
+import eu.neydev.neyshulker.config.NeyShulkerConfig;
 import eu.neydev.neyshulker.config.type.MessageKey;
 import eu.neydev.neyshulker.model.ShulkerSession;
 import eu.neydev.neyshulker.registry.SessionRegistry;
+import eu.neydev.neyshulker.util.SessionTagger;
 import eu.neydev.neyshulker.util.ShulkerUtil;
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
@@ -18,21 +19,22 @@ import org.jetbrains.annotations.Nullable;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.logging.Level;
 
 /**
  * Сервис сохранения содержимого открытого шалкер-бокса обратно в предмет.
  *
- * Ключевые решения текущей реализации, которые закрывают дюп
- * (legacy-код FunnyShulker базовой линией не считается):
+ * Ключевые решения текущей реализации, которые закрывают дюп:
  * 1. Сохранение выполняется строго в главном потоке - никаких гонок с кликами.
- * 2. Перед записью слот проверяется: если бокс исчез или заменен,
- *    содержимое не воссоздается из пустоты - сессия открепляется.
+ * 2. Целевой слот ищется по метке сессии в PersistentDataContainer предмета:
+ *    содержимое не может быть записано в бокс-близнец того же материала,
+ *    а при исчезновении помеченного бокса сессия открепляется.
  * 3. Флаг saving исключает повторный вход и параллельные записи.
  */
 public class ShulkerPersistenceService {
 
     private final NeyShulker plugin;
-    private final ConfigManager configManager;
+    private final NeyShulkerConfig config;
     private final SessionRegistry sessionRegistry;
     private final ShulkerContentService contentService;
     private final MessageService messageService;
@@ -41,13 +43,13 @@ public class ShulkerPersistenceService {
     private final Map<UUID, BukkitTask> autoSaveTasks = new ConcurrentHashMap<>();
 
     public ShulkerPersistenceService(@NotNull NeyShulker plugin,
-                                     @NotNull ConfigManager configManager,
+                                     @NotNull NeyShulkerConfig config,
                                      @NotNull SessionRegistry sessionRegistry,
                                      @NotNull ShulkerContentService contentService,
                                      @NotNull MessageService messageService) {
 
         this.plugin = plugin;
-        this.configManager = configManager;
+        this.config = config;
         this.sessionRegistry = sessionRegistry;
         this.contentService = contentService;
         this.messageService = messageService;
@@ -97,7 +99,7 @@ public class ShulkerPersistenceService {
             }
 
             PlayerInventory inventory = player.getInventory();
-            int slot = resolveSlot(inventory, session.getSlot(), saved.getType());
+            int slot = resolveSlot(inventory, session, session.getSlot(), saved.getType());
 
             if (slot < 0) {
                 detach(player, session);
@@ -105,8 +107,8 @@ public class ShulkerPersistenceService {
             }
 
             if (slot != session.getSlot()) {
-                // Бокс переехал внешним вмешательством: следуем за ним, а не
-                // воссоздаем вторую копию в осиротевшем слоте
+                // Помеченный бокс переехал внешним вмешательством: следуем
+                // за меткой, а не воссоздаем вторую копию в осиротевшем слоте
                 session.setSlot(slot);
             }
 
@@ -120,13 +122,47 @@ public class ShulkerPersistenceService {
 
         } catch (RuntimeException exception) {
 
-            plugin.getLogger().severe("Failed to save the shulker box of player "
-                    + player.getName() + ": " + exception.getMessage());
+            plugin.getLogger().log(Level.SEVERE,
+                    "Failed to save the shulker box of player " + player.getName(), exception);
             return false;
 
         } finally {
             session.saving().set(false);
         }
+
+    }
+
+    /**
+     * Финализирует сессию при закрытии: снимает служебную метку с живого
+     * предмета и возвращает его слепок для {@code ShulkerCloseEvent}.
+     *
+     * @param session закрываемая сессия (сохранение уже выполнено)
+     * @return фактический предмет после сохранения или слепок открытия,
+     *         если живой предмет недоступен
+     */
+    public @NotNull ItemStack finalizeSession(@NotNull ShulkerSession session) {
+
+        Player player = session.getPlayer();
+
+        if (player != null && player.isOnline() && Bukkit.isPrimaryThread()) {
+
+            PlayerInventory inventory = player.getInventory();
+            ItemStack live = inventory.getItem(session.getSlot());
+
+            if (SessionTagger.isSession(live, session.sessionId())) {
+
+                ItemStack stripped = SessionTagger.strip(live);
+
+                if (stripped != null) {
+                    inventory.setItem(session.getSlot(), stripped);
+                    return stripped.clone();
+                }
+
+            }
+
+        }
+
+        return session.shulkerItem().clone();
 
     }
 
@@ -179,7 +215,9 @@ public class ShulkerPersistenceService {
      */
     public void scheduleAutoSave(@NotNull ShulkerSession session) {
 
-        long interval = configManager.getSaveInterval();
+        cancelAutoSave(session);
+
+        long interval = config.getSaveInterval();
 
         BukkitTask task = Bukkit.getScheduler().runTaskTimer(plugin,
                 () -> persist(session, false), interval, interval);
@@ -238,21 +276,47 @@ public class ShulkerPersistenceService {
     /**
      * Определяет слот для записи.
      *
-     * 1. Исходный слот все еще держит бокс того же типа - пишем туда.
-     * 2. Исходный слот пуст и бокс того же типа найден в инвентаре - бокс
-     *    переехал внешним вмешательством, следуем за ним (пере-якорение).
-     * 3. Иначе писать некуда: воссоздание предмета в пустом слоте дюпало
-     *    копией, пока оригинал лежал на земле.
+     * Если предмет сессии помечен (штатный путь), запись идет только
+     * в помеченный предмет: исходный слот, затем поиск метки по инвентарю.
+     * Бокс-близнец того же материала целью не считается - запись в него
+     * оставила бы украденный оригинал с содержимым последнего автосейва.
+     *
+     * Для немеченых предметов (тестовые заглушки без ItemMeta) действует
+     * legacy-правило: исходный слот с материалом бокса или пустой исходный
+     * слот и бокс того же типа в инвентаре.
      *
      * @param inventory инвентарь игрока
+     * @param session   сохраняемая сессия
      * @param slot      слот сессии
      * @param savedType материал сохраняемого бокса
      * @return слот для записи или -1, если писать некуда
      */
-    static int resolveSlot(@NotNull PlayerInventory inventory, int slot, @NotNull Material savedType) {
+    static int resolveSlot(@NotNull PlayerInventory inventory,
+                           @NotNull ShulkerSession session,
+                           int slot,
+                           @NotNull Material savedType) {
 
         if (slot < 0 || slot >= inventory.getSize()) {
             return -1;
+        }
+
+        UUID sessionId = session.sessionId();
+        boolean tagged = SessionTagger.isSession(session.shulkerItem(), sessionId);
+
+        if (tagged) {
+
+            if (SessionTagger.isSession(inventory.getItem(slot), sessionId)) {
+                return slot;
+            }
+
+            for (int i = 0; i < inventory.getSize(); i++) {
+                if (SessionTagger.isSession(inventory.getItem(i), sessionId)) {
+                    return i;
+                }
+            }
+
+            return -1;
+
         }
 
         ItemStack current = inventory.getItem(slot);

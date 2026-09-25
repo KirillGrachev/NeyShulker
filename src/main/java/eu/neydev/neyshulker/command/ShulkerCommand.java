@@ -1,13 +1,16 @@
 package eu.neydev.neyshulker.command;
 
-import eu.neydev.neyshulker.NeyShulker;
+import eu.neydev.neyshulker.config.ConfigManager;
 import eu.neydev.neyshulker.config.type.MessageKey;
 import eu.neydev.neyshulker.config.type.PermissionNode;
 import eu.neydev.neyshulker.model.ShulkerSession;
+import eu.neydev.neyshulker.model.ValidationResult;
+import eu.neydev.neyshulker.registry.SessionRegistry;
 import eu.neydev.neyshulker.service.AutoCollectService;
 import eu.neydev.neyshulker.service.MessageService;
 import eu.neydev.neyshulker.service.PermissionService;
 import eu.neydev.neyshulker.service.ShulkerOpenService;
+import eu.neydev.neyshulker.service.ShulkerValidationService;
 import eu.neydev.neyshulker.util.ShulkerUtil;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandSender;
@@ -25,22 +28,37 @@ import java.util.Map;
 /**
  * Команда /shulker: перезагрузка конфигурации, открытие шалкер-бокса,
  * информация о текущей сессии и переключение автосбора.
+ *
+ * Открытие командой проходит ту же валидацию, что и интеракт
+ * (мастер-выключатель, права, черный список) - за вычетом способа
+ * открытия, который к команде неприменим. Информация о сессии
+ * считается по живому содержимому GUI, а не по слепку открытия.
  */
 public class ShulkerCommand implements TabExecutor {
 
-    private final NeyShulker plugin;
+    private final ConfigManager configManager;
     private final PermissionService permissionService;
     private final MessageService messageService;
     private final ShulkerOpenService openService;
+    private final ShulkerValidationService validationService;
     private final AutoCollectService autoCollectService;
+    private final SessionRegistry sessionRegistry;
 
-    public ShulkerCommand(@NotNull NeyShulker plugin) {
+    public ShulkerCommand(@NotNull ConfigManager configManager,
+                          @NotNull PermissionService permissionService,
+                          @NotNull MessageService messageService,
+                          @NotNull ShulkerOpenService openService,
+                          @NotNull ShulkerValidationService validationService,
+                          @NotNull AutoCollectService autoCollectService,
+                          @NotNull SessionRegistry sessionRegistry) {
 
-        this.plugin = plugin;
-        this.permissionService = plugin.getServices().getPermissionService();
-        this.messageService = plugin.getServices().getMessageService();
-        this.openService = plugin.getServices().getOpenService();
-        this.autoCollectService = plugin.getServices().getAutoCollectService();
+        this.configManager = configManager;
+        this.permissionService = permissionService;
+        this.messageService = messageService;
+        this.openService = openService;
+        this.validationService = validationService;
+        this.autoCollectService = autoCollectService;
+        this.sessionRegistry = sessionRegistry;
 
     }
 
@@ -73,11 +91,18 @@ public class ShulkerCommand implements TabExecutor {
                                                 @NotNull String alias,
                                                 String @NotNull [] args) {
 
-        if (args.length == 1) {
-            return filter(List.of("reload", "open", "info", "autocollect"), args[0]);
+        if (args.length != 1) {
+            return List.of();
         }
 
-        return List.of();
+        List<String> candidates = new ArrayList<>(List.of("open", "info", "autocollect"));
+
+        // reload подсказывается только тем, у кого есть право на него
+        if (permissionService.has(sender, PermissionNode.RELOAD)) {
+            candidates.add(0, "reload");
+        }
+
+        return filter(candidates, args[0]);
 
     }
 
@@ -88,7 +113,7 @@ public class ShulkerCommand implements TabExecutor {
             return;
         }
 
-        plugin.getConfigManager().reload();
+        configManager.reload();
         messageService.send(sender, MessageKey.RELOAD, Map.of());
 
     }
@@ -119,6 +144,19 @@ public class ShulkerCommand implements TabExecutor {
             return;
         }
 
+        // Мастер-выключатель и черный список действуют и на командный путь
+        ValidationResult validation = validationService.canOpenViaCommand(player, item);
+
+        if (!validation.isAllowed()) {
+
+            if (validation.getMessageKey() != null) {
+                messageService.send(player, validation.getMessageKey());
+            }
+
+            return;
+
+        }
+
         if (!openService.open(player, item, slot)) {
             messageService.send(player, MessageKey.OPEN_ERROR);
         }
@@ -132,11 +170,11 @@ public class ShulkerCommand implements TabExecutor {
             return;
         }
 
-        ShulkerSession session = plugin.getServices().getSessionRegistry().getSession(player);
+        ShulkerSession session = sessionRegistry.getSession(player);
 
         if (session == null) {
 
-            boolean autoCollectActive = plugin.getConfigManager().isAutoCollectEnabled()
+            boolean autoCollectActive = configManager.isAutoCollectEnabled()
                     && autoCollectService.isEnabledFor(player);
 
             messageService.send(player, MessageKey.INFO_IDLE, Map.of(
@@ -145,16 +183,17 @@ public class ShulkerCommand implements TabExecutor {
 
         }
 
-        ItemStack shulker = session.shulkerItem();
-        int freeSlots = ShulkerUtil.countFreeSlots(shulker);
+        // Живое содержимое GUI, а не слепок открытия: автосохранения и
+        // перекладывания меняют бокс, и info должен показывать реальность
+        int freeSlots = ShulkerUtil.countFreeSlots(session.inventory());
+        int items = ShulkerUtil.countItems(session.inventory());
 
         messageService.send(player, MessageKey.INFO_SESSION, Map.of(
                 "name", session.getShulkerName(),
                 "slot", String.valueOf(session.getSlot()),
                 "free", String.valueOf(freeSlots),
                 "size", String.valueOf(ShulkerUtil.SHULKER_SIZE),
-
-                "items", String.valueOf(ShulkerUtil.countItems(shulker)),
+                "items", String.valueOf(items),
                 "seconds", String.valueOf((System.currentTimeMillis() - session.openedAt()) / 1000L)));
 
     }
@@ -200,8 +239,10 @@ public class ShulkerCommand implements TabExecutor {
      * @return текст статуса для подстановки
      */
     private @NotNull String state(boolean enabled) {
+
         return String.join(" ", messageService.build(
                 enabled ? MessageKey.STATE_ON : MessageKey.STATE_OFF, Map.of()));
+
     }
 
 }

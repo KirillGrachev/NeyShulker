@@ -1,14 +1,14 @@
 package eu.neydev.neyshulker.listener;
 
 import eu.neydev.neyshulker.NeyShulker;
-import eu.neydev.neyshulker.config.ConfigManager;
+import eu.neydev.neyshulker.config.NeyShulkerConfig;
 import eu.neydev.neyshulker.config.type.MessageKey;
 import eu.neydev.neyshulker.model.ValidationResult;
 import eu.neydev.neyshulker.registry.SessionRegistry;
-import eu.neydev.neyshulker.util.ShulkerUtil;
 import eu.neydev.neyshulker.service.MessageService;
 import eu.neydev.neyshulker.service.ShulkerOpenService;
 import eu.neydev.neyshulker.service.ShulkerValidationService;
+import eu.neydev.neyshulker.util.ShulkerUtil;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
@@ -23,27 +23,31 @@ import org.jetbrains.annotations.NotNull;
 /**
  * Слушатель взаимодействия: открывает шалкер-бокс из руки игрока.
  *
- * Режим SHIFT (по умолчанию) решает главную проблему оригинала:
- * крадущийся игрок не размещает блок, поэтому шалкер можно спокойно поставить,
- * а открыть - зажав Shift.
+ * Режим AIR (по умолчанию) решает главную проблему оригинала: клик по блоку
+ * остается ванильным, поэтому шалкер можно поставить, а открыть - по воздуху.
  */
 public class PlayerInteractListener implements Listener {
 
     private final NeyShulker plugin;
-    private final ConfigManager configManager;
+    private final NeyShulkerConfig config;
     private final ShulkerValidationService validationService;
     private final ShulkerOpenService openService;
     private final MessageService messageService;
     private final SessionRegistry sessionRegistry;
 
-    public PlayerInteractListener(@NotNull NeyShulker plugin) {
+    public PlayerInteractListener(@NotNull NeyShulker plugin,
+                                  @NotNull NeyShulkerConfig config,
+                                  @NotNull ShulkerValidationService validationService,
+                                  @NotNull ShulkerOpenService openService,
+                                  @NotNull MessageService messageService,
+                                  @NotNull SessionRegistry sessionRegistry) {
 
         this.plugin = plugin;
-        this.configManager = plugin.getServices().getConfigManager();
-        this.validationService = plugin.getServices().getValidationService();
-        this.openService = plugin.getServices().getOpenService();
-        this.messageService = plugin.getServices().getMessageService();
-        this.sessionRegistry = plugin.getServices().getSessionRegistry();
+        this.config = config;
+        this.validationService = validationService;
+        this.openService = openService;
+        this.messageService = messageService;
+        this.sessionRegistry = sessionRegistry;
 
     }
 
@@ -105,6 +109,13 @@ public class PlayerInteractListener implements Listener {
                 return;
             }
 
+            // Интеракт приходит на обе руки и планируется двумя задачами:
+            // если сессия уже открыта первой из них, вторая молча выходит
+            // без пугающего OPEN_ERROR
+            if (sessionRegistry.hasSession(player.getUniqueId())) {
+                return;
+            }
+
             if (!openService.open(player, shulker, slot)) {
                 messageService.send(player, MessageKey.OPEN_ERROR);
             }
@@ -115,7 +126,7 @@ public class PlayerInteractListener implements Listener {
 
     private boolean isOpeningAction(@NotNull PlayerInteractEvent event) {
 
-        if (!configManager.isPluginEnabled()) {
+        if (!config.isPluginEnabled()) {
             return false;
         }
 

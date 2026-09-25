@@ -1,7 +1,5 @@
 package eu.neydev.neyshulker.listener;
 
-import eu.neydev.neyshulker.NeyShulker;
-import eu.neydev.neyshulker.ServiceContainer;
 import eu.neydev.neyshulker.service.collect.PlayerDropTracker;
 import org.bukkit.entity.Item;
 import org.bukkit.event.player.PlayerDropItemEvent;
@@ -19,18 +17,8 @@ import static org.mockito.Mockito.when;
  */
 class PlayerDropListenerTest {
 
-    private final NeyShulker plugin = mock(NeyShulker.class);
-    private final ServiceContainer services = mock(ServiceContainer.class);
     private final PlayerDropTracker tracker = new PlayerDropTracker(() -> 0L);
-    private final PlayerDropListener listener = listener();
-
-    private PlayerDropListener listener() {
-
-        when(plugin.getServices()).thenReturn(services);
-        when(services.getDropTracker()).thenReturn(tracker);
-        return new PlayerDropListener(plugin);
-
-    }
+    private final PlayerDropListener listener = new PlayerDropListener(tracker);
 
     @Test
     @DisplayName("Брошенный дроп записывается в памятку")

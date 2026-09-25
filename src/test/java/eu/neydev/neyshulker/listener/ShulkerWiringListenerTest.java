@@ -1,7 +1,6 @@
 package eu.neydev.neyshulker.listener;
 
-import eu.neydev.neyshulker.NeyShulker;
-import eu.neydev.neyshulker.ServiceContainer;
+import eu.neydev.neyshulker.inventory.NeyShulkerViewer;
 import eu.neydev.neyshulker.model.ShulkerSession;
 import eu.neydev.neyshulker.registry.SessionRegistry;
 import eu.neydev.neyshulker.service.AutoCollectService;
@@ -28,12 +27,14 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 /**
- * Проверка wiring-а слушателей синхронизации, переноса и очистки:
- * каждый реагирует ровно на свои события и дергает нужный сервис.
+ * Проверка wiring-а слушателей синхронизации и очистки:
+ * каждый реагирует ровно на свои события и дергает нужный сервис,
+ * а чужие инвентари отсекаются holder-маркером до поиска в реестре.
  */
 class ShulkerWiringListenerTest {
 
@@ -51,30 +52,25 @@ class ShulkerWiringListenerTest {
 
         ItemStack shulker = mock(ItemStack.class);
         when(shulker.clone()).thenReturn(shulker);
-        return ShulkerSession.create(UUID.randomUUID(), player, shulker, () -> gui, 2);
+
+        Player owner = mock(Player.class);
+        when(owner.getUniqueId()).thenReturn(UUID.randomUUID());
+        return ShulkerSession.create(UUID.randomUUID(), owner, shulker, () -> gui, 2);
 
     }
 
-    private NeyShulker plugin() {
-
-        ServiceContainer container = mock(ServiceContainer.class);
-        NeyShulker plugin = mock(NeyShulker.class);
-
-        when(container.getSessionRegistry()).thenReturn(sessionRegistry);
-        when(container.getTransferService()).thenReturn(transferService);
-        when(container.getCloseService()).thenReturn(closeService);
-        when(container.getAutoCollectService()).thenReturn(autoCollectService);
-        when(plugin.getServices()).thenReturn(container);
-        return plugin;
-
+    private void markGuiAsPluginInventory() {
+        when(gui.getHolder()).thenReturn(mock(NeyShulkerViewer.class));
     }
 
     @Test
     @DisplayName("SyncListener помечает сессию измененной на клике и drag")
     void syncListenerMarksSession() {
 
+        markGuiAsPluginInventory();
         when(sessionRegistry.getSessionByInventory(gui)).thenReturn(session);
-        ShulkerSyncListener listener = new ShulkerSyncListener(plugin());
+
+        ShulkerSyncListener listener = new ShulkerSyncListener(sessionRegistry, transferService);
 
         InventoryClickEvent click = mock(InventoryClickEvent.class);
         when(click.getInventory()).thenReturn(gui);
@@ -85,22 +81,24 @@ class ShulkerWiringListenerTest {
         listener.onInventoryClick(click);
         listener.onInventoryDrag(drag);
 
-        verify(transferService, org.mockito.Mockito.times(2)).markChanged(session);
+        verify(transferService, times(2)).markChanged(session);
 
     }
 
     @Test
-    @DisplayName("SyncListener молчит на чужих инвентарях")
+    @DisplayName("SyncListener молчит на чужих инвентарях и не трогает реестр")
     void syncListenerIgnoresForeignInventories() {
 
         Inventory chest = TestInventories.inventory(27);
-        ShulkerSyncListener listener = new ShulkerSyncListener(plugin());
+        ShulkerSyncListener listener = new ShulkerSyncListener(sessionRegistry, transferService);
 
         InventoryClickEvent click = mock(InventoryClickEvent.class);
         when(click.getInventory()).thenReturn(chest);
 
         listener.onInventoryClick(click);
+
         verify(transferService, never()).markChanged(session);
+        verify(sessionRegistry, never()).getSessionByInventory(any());
 
     }
 
@@ -122,7 +120,9 @@ class ShulkerWiringListenerTest {
         when(gui.getHolder()).thenReturn(viewer);
         when(sessionRegistry.getSessionByInventory(gui)).thenReturn(session);
 
-        ShulkerCleanupListener listener = new ShulkerCleanupListener(plugin());
+        ShulkerCleanupListener listener = new ShulkerCleanupListener(
+                sessionRegistry, closeService, autoCollectService);
+
         InventoryCloseEvent close = mock(InventoryCloseEvent.class);
 
         when(close.getInventory()).thenReturn(gui);
@@ -130,12 +130,44 @@ class ShulkerWiringListenerTest {
 
         listener.onInventoryClose(close);
         verify(closeService).close(player, session);
+
         PlayerQuitEvent quit = mock(PlayerQuitEvent.class);
         when(quit.getPlayer()).thenReturn(player);
         listener.onPlayerQuit(quit);
 
         verify(closeService).close(player);
         verify(autoCollectService).forget(player);
+
+    }
+
+
+    @Test
+    @DisplayName("CleanupListener игнорирует чужие инвентари и не-игроков")
+    void cleanupListenerIgnoresForeignAndNonPlayer() {
+
+        ShulkerCleanupListener listener = new ShulkerCleanupListener(
+                sessionRegistry, closeService, autoCollectService);
+
+        // Чужой holder
+        Inventory chest = TestInventories.inventory(27);
+        InventoryCloseEvent close = mock(InventoryCloseEvent.class);
+
+        when(close.getInventory()).thenReturn(chest);
+        when(close.getPlayer()).thenReturn(player);
+
+        listener.onInventoryClose(close);
+        verify(closeService, never()).close(any(org.bukkit.entity.Player.class), any());
+
+        // Наш holder, но закрывает не игрок (HumanEntity без Player):
+        // событийный контракт InventoryCloseEvent#getPlayer - HumanEntity
+        markGuiAsPluginInventory();
+
+        InventoryCloseEvent nonPlayer = mock(InventoryCloseEvent.class);
+        when(nonPlayer.getInventory()).thenReturn(gui);
+        when(nonPlayer.getPlayer()).thenReturn(mock(org.bukkit.entity.HumanEntity.class));
+
+        listener.onInventoryClose(nonPlayer);
+        verify(closeService, never()).close(any(org.bukkit.entity.Player.class), any());
 
     }
 

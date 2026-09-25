@@ -11,36 +11,58 @@ import org.jetbrains.annotations.Nullable;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.Supplier;
 
 /**
  * Сессия открытого шалкер-бокса.
  * Хранит точную привязку к слоту инвентаря игрока и состояние сохранения.
  *
- * @param sessionId     уникальный идентификатор сессии
- * @param playerId      идентификатор владельца
- * @param shulkerItem   слепок предмета на момент открытия
- * @param inventory     GUI-инвентарь сессии
- * @param openedAt      время открытия в миллисекундах
- * @param slot          слот инвентаря, в котором лежит шалкер-бокс
- * @param saving        флаг выполняющегося сохранения (защита от повторного входа)
- * @param saveScheduled флаг запланированного сохранения
- * @param detached      сессия откреплена: бокс покинул слот, записи больше не будет
+ * Осознанно обычный final-класс, а не record: состояние сессии изменяемо
+ * (слот может переехать, флаги сохранения переключаются), а record
+ * декларирует прозрачного неизменяемого носителя и генерирует
+ * equals/hashCode по компонентам, которые здесь никому не нужны -
+ * сессии везде сравниваются по ссылке.
+ *
+ * Идентификатор сессии одновременно пишется в PersistentDataContainer
+ * предмета (см. {@link eu.neydev.neyshulker.util.SessionTagger}):
+ * метка, а не слот, является источником истины о том, какой именно
+ * предмет принадлежит этой сессии.
  */
-public record ShulkerSession(
-        @NotNull UUID sessionId,
-        @NotNull UUID playerId,
-        @NotNull ItemStack shulkerItem,
-        @NotNull Inventory inventory,
-        long openedAt,
-        @NotNull AtomicInteger slot,
-        @NotNull AtomicBoolean saving,
-        @NotNull AtomicBoolean saveScheduled,
-        @NotNull AtomicBoolean detached
-) {
+public final class ShulkerSession {
+
+    private final UUID sessionId;
+    private final UUID playerId;
+    private final ItemStack shulkerItem;
+    private final Inventory inventory;
+    private final long openedAt;
+
+    private final AtomicInteger slot;
+    private final AtomicBoolean saving = new AtomicBoolean(false);
+    private final AtomicBoolean saveScheduled = new AtomicBoolean(false);
+    private final AtomicBoolean detached = new AtomicBoolean(false);
+
+    private ShulkerSession(@NotNull UUID sessionId,
+                           @NotNull UUID playerId,
+                           @NotNull ItemStack shulkerItem,
+                           @NotNull Inventory inventory,
+                           long openedAt,
+                           int slot) {
+
+        this.sessionId = sessionId;
+        this.playerId = playerId;
+        this.shulkerItem = shulkerItem;
+        this.inventory = inventory;
+        this.openedAt = openedAt;
+        this.slot = new AtomicInteger(slot);
+
+    }
 
     /**
      * Создает сессию. Инвентарь поставляется фабрикой,
      * которая вызывается ровно один раз.
+     *
+     * Внимание: фабрика создает Bukkit-инвентарь, поэтому вызов допустим
+     * только из главного потока.
      *
      * @param sessionId        идентификатор сессии
      * @param player           владелец
@@ -52,19 +74,43 @@ public record ShulkerSession(
     public static @NotNull ShulkerSession create(@NotNull UUID sessionId,
                                                  @NotNull Player player,
                                                  @NotNull ItemStack shulkerItem,
-                                                 @NotNull java.util.function.Supplier<Inventory> inventoryFactory,
+                                                 @NotNull Supplier<Inventory> inventoryFactory,
                                                  int slot) {
+
         return new ShulkerSession(
                 sessionId,
                 player.getUniqueId(),
                 shulkerItem.clone(),
                 inventoryFactory.get(),
                 System.currentTimeMillis(),
-                new AtomicInteger(slot),
-                new AtomicBoolean(false),
-                new AtomicBoolean(false),
-                new AtomicBoolean(false)
+                slot
         );
+
+    }
+
+    public @NotNull UUID sessionId() {
+        return sessionId;
+    }
+
+    public @NotNull UUID playerId() {
+        return playerId;
+    }
+
+    /**
+     * Слепок предмета на момент открытия. Может устаревать по содержимому
+     * (автосохранения переписывают мету живого предмета), поэтому для
+     * опознания бокса используется метка сессии, а не сравнение слепков.
+     */
+    public @NotNull ItemStack shulkerItem() {
+        return shulkerItem;
+    }
+
+    public @NotNull Inventory inventory() {
+        return inventory;
+    }
+
+    public long openedAt() {
+        return openedAt;
     }
 
     public int getSlot() {
@@ -73,6 +119,14 @@ public record ShulkerSession(
 
     public void setSlot(int newSlot) {
         slot.set(newSlot);
+    }
+
+    public @NotNull AtomicBoolean saving() {
+        return saving;
+    }
+
+    public @NotNull AtomicBoolean saveScheduled() {
+        return saveScheduled;
     }
 
     /**
@@ -86,6 +140,11 @@ public record ShulkerSession(
         return ShulkerUtil.getShulkerName(shulkerItem);
     }
 
+    /**
+     * Живой игрок сессии. Удобство для слушателей; обращение к статике
+     * Bukkit осознанное: сессия не должна таскать ссылку на Player
+     * (игрок может переподключиться, а UUID остается стабильным).
+     */
     public @Nullable Player getPlayer() {
         return Bukkit.getPlayer(playerId);
     }

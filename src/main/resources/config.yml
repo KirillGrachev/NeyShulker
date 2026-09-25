@@ -80,6 +80,10 @@ settings:
       respect_nearby_players: 4.5 # Skip a drop when another player stands within
       # this many blocks of it (0 disables): on spawn or at someone's farm the loot
       # counts as theirs; solo farming is unaffected
+      gamemodes: # Game modes the auto-collect works in (an empty or broken list
+      # falls back to the default): creative servers can opt their builders in
+        - "SURVIVAL"
+        - "ADVENTURE"
       # Target box for a drop when several boxes qualify, top tier first:
       #   1 - a box with a partial stack of the drop type (merge_into_existing),
       #       the stack with the most room left absorbs the drop
@@ -112,6 +116,24 @@ settings:
       - "STRUCTURE_BLOCK"
       - "JIGSAW"
       - "SPAWNER"
+
+sounds: # Sounds are fully configurable: name (org.bukkit.Sound), enabled flag,
+  # volume and pitch. An unknown name falls back to the default with a console notice.
+  open:
+    enabled: true
+    sound: BLOCK_SHULKER_BOX_OPEN
+    volume: 1.0
+    pitch: 1.0
+  close:
+    enabled: true
+    sound: BLOCK_SHULKER_BOX_CLOSE
+    volume: 1.0
+    pitch: 1.0
+  collect:
+    enabled: true
+    sound: ENTITY_ITEM_PICKUP
+    volume: 0.5
+    pitch: 1.2
 
 messages:
   enabled: true # Master switch for all plugin messages
@@ -220,33 +242,6 @@ messages:
   reload:
     enabled: true
     text: "{prefix}&#9dff8cConfiguration reloaded."
-
-  console: # Console notices in the same format as chat messages:
-    # enabled flag plus text as a list of lines, HEX colors and {placeholders}
-    unknown_sound:
-      enabled: true
-      text:
-        - "&eUnknown sound at {path}: '{value}'. Using {defaultValue}."
-    unknown_material:
-      enabled: true
-      text:
-        - "&eUnknown material at {path}: '{value}'. Skipped."
-    invalid_value:
-      enabled: true
-      text:
-        - "&eInvalid value at {path}: '{value}'. Using {defaultValue}."
-    legacy_path:
-      enabled: true
-      text:
-        - "&eLegacy config path {path}: use {replacement} instead."
-    command_missing:
-      enabled: true
-      text:
-        - "&eCommand {command} is missing from plugin.yml."
-    command_unregister_failed:
-      enabled: true
-      text:
-        - "&eFailed to unregister command {command}: {reason}."
 
 permissions:
   enabled: false # Enable the permission system (all checks below become active)

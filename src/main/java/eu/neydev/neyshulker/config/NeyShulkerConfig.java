@@ -7,6 +7,7 @@ import eu.neydev.neyshulker.config.type.SoundSettings;
 import eu.neydev.neyshulker.config.type.CollectMode;
 import eu.neydev.neyshulker.config.type.FillOrderType;
 import eu.neydev.neyshulker.config.type.TitleMode;
+import org.bukkit.GameMode;
 import org.bukkit.Material;
 
 import java.util.List;
@@ -65,6 +66,11 @@ public interface NeyShulkerConfig {
      * @return радиус в блоках: дроп, у которого стоит другой игрок, не собирается (0 выключает)
      */
     double getAutoCollectRespectNearbyPlayers();
+
+    /**
+     * @return режимы игры, в которых автосбор активен (по умолчанию SURVIVAL и ADVENTURE)
+     */
+    Set<GameMode> getAutoCollectGameModes();
 
     FillOrderType getAutoCollectFillOrder();
     List<Material> getAutoCollectPriorityItems();

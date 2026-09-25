@@ -6,15 +6,23 @@ import eu.neydev.neyshulker.event.ShulkerOpenEvent;
 import eu.neydev.neyshulker.inventory.NeyShulkerViewer;
 import eu.neydev.neyshulker.model.ShulkerSession;
 import eu.neydev.neyshulker.registry.SessionRegistry;
+import eu.neydev.neyshulker.util.SessionTagger;
 import eu.neydev.neyshulker.util.ShulkerUtil;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.Map;
+import java.util.UUID;
+import java.util.logging.Level;
 
 /**
  * Сервис открытия шалкер-бокса: создание сессии, GUI и запуск автосохранения.
+ *
+ * Порядок операций: предмет в слоте помечается меткой сессии (PDC),
+ * создается сессия, загружается содержимое, вызывается отменяемое событие
+ * и ТОЛЬКО затем открывается GUI. Отмена события не показывает игроку окно:
+ * откатывать нечего, сессия просто снимается с реестра.
  */
 public class ShulkerOpenService {
 
@@ -80,27 +88,39 @@ public class ShulkerOpenService {
 
         try {
 
-            ShulkerSession session = createSession(player, shulker, slot);
+            UUID sessionId = UUID.randomUUID();
+
+            // Метка сессии пишется в живой предмет слота: с этого момента
+            // идентичность бокса определяется меткой, а не слотом
+            ItemStack tagged = SessionTagger.tag(shulker, sessionId);
+
+            if (tagged == null) {
+                return false;
+            }
+
+            player.getInventory().setItem(slot, tagged);
+
+            ShulkerSession session = createSession(sessionId, player, tagged, slot);
 
             if (session == null) {
                 return false;
             }
 
-            contentService.loadInto(shulker, session.inventory());
-            player.openInventory(session.inventory());
+            contentService.loadInto(tagged, session.inventory());
 
-            if (!callOpenEvent(player, session, shulker)) {
+            if (!callOpenEvent(player, session, tagged)) {
                 rollback(player);
                 return false;
             }
 
+            player.openInventory(session.inventory());
             persistenceService.scheduleAutoSave(session);
             soundService.playOpen(player);
             return true;
 
         } catch (RuntimeException exception) {
 
-            plugin.getLogger().severe("Failed to open a shulker box: " + exception.getMessage());
+            plugin.getLogger().log(Level.SEVERE, "Failed to open a shulker box", exception);
             messageService.send(player, MessageKey.OPEN_ERROR, Map.of());
             rollback(player);
             return false;
@@ -109,13 +129,14 @@ public class ShulkerOpenService {
 
     }
 
-    private ShulkerSession createSession(@NotNull Player player,
+    private ShulkerSession createSession(@NotNull UUID sessionId,
+                                         @NotNull Player player,
                                          @NotNull ItemStack shulker,
                                          int slot) {
 
         String title = titleService.resolve(player, shulker);
 
-        return sessionRegistry.createSession(player, shulker, slot,
+        return sessionRegistry.createSession(sessionId, player, shulker, slot,
                 () -> new NeyShulkerViewer(title).getInventory());
 
     }
@@ -124,7 +145,7 @@ public class ShulkerOpenService {
                                   @NotNull ShulkerSession session,
                                   @NotNull ItemStack shulker) {
 
-        ShulkerOpenEvent event = new ShulkerOpenEvent(player, session, shulker);
+        ShulkerOpenEvent event = new ShulkerOpenEvent(player, shulker, session.getSlot());
         plugin.getServer().getPluginManager().callEvent(event);
         return !event.isCancelled();
 
@@ -132,8 +153,8 @@ public class ShulkerOpenService {
 
     private void rollback(@NotNull Player player) {
 
+        // GUI к этому моменту не открывался: достаточно снять сессию с реестра
         sessionRegistry.closeSession(player.getUniqueId());
-        player.closeInventory();
 
     }
 

@@ -1,7 +1,5 @@
 package eu.neydev.neyshulker.listener;
 
-import eu.neydev.neyshulker.NeyShulker;
-import eu.neydev.neyshulker.ServiceContainer;
 import eu.neydev.neyshulker.service.AutoCollectService;
 import org.bukkit.entity.HumanEntity;
 import org.bukkit.entity.Player;
@@ -39,19 +37,8 @@ class WaitListSyncListenerTest {
     private final AutoCollectService autoCollectService = mock(AutoCollectService.class);
     private final Player player = mock(Player.class);
 
-    private NeyShulker plugin() {
-
-        ServiceContainer container = mock(ServiceContainer.class);
-        NeyShulker plugin = mock(NeyShulker.class);
-
-        when(container.getAutoCollectService()).thenReturn(autoCollectService);
-        when(plugin.getServices()).thenReturn(container);
-        return plugin;
-
-    }
-
     private WaitListSyncListener listener() {
-        return new WaitListSyncListener(plugin());
+        return new WaitListSyncListener(autoCollectService);
     }
 
     @Test

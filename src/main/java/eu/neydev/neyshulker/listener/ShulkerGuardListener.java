@@ -1,14 +1,16 @@
 package eu.neydev.neyshulker.listener;
 
-import eu.neydev.neyshulker.NeyShulker;
 import eu.neydev.neyshulker.config.type.MessageKey;
+import eu.neydev.neyshulker.inventory.NeyShulkerViewer;
 import eu.neydev.neyshulker.model.ShulkerSession;
 import eu.neydev.neyshulker.model.ValidationResult;
 import eu.neydev.neyshulker.registry.SessionRegistry;
 import eu.neydev.neyshulker.service.MessageService;
 import eu.neydev.neyshulker.service.ShulkerValidationService;
+import eu.neydev.neyshulker.util.SessionTagger;
 import eu.neydev.neyshulker.util.ShulkerUtil;
 import eu.neydev.neyshulker.util.ViewSlotUtil;
+import org.bukkit.Material;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
@@ -34,6 +36,10 @@ import java.util.concurrent.ConcurrentHashMap;
  * Именно отсутствие этих проверок приводило к дюпу при быстром перебирании предметов.
  * Содержимое бокса и посторонние предметы выбрасываются из GUI свободно:
  * охранник трогает только сам открытый бокс и ничего лишнего.
+ *
+ * Быстрый гейт: обработчики кликов и drag-ов сначала сверяют holder инвентаря
+ * с маркером {@link NeyShulkerViewer} (O(1)), поэтому чужие инвентари сервера
+ * не платят ни за поиск в реестре, ни за валидацию.
  */
 public class ShulkerGuardListener implements Listener {
 
@@ -42,22 +48,42 @@ public class ShulkerGuardListener implements Listener {
      * приходит следом за кликом на том же тике, большего окна не нужно.
      */
     private static final long DROP_MARKER_WINDOW_MILLIS = 250L;
-    private final Map<UUID, Long> allowedDrops = new ConcurrentHashMap<>();
+
+    /**
+     * Метка пропущенного клика с отпечатком ожидаемого дропа: тип и потолок
+     * количества. Маркер без отпечатка разрешал бы ЛЮБОЙ дроп в окне 250 мс,
+     * включая выброшенный чужим путем открытый бокс; с отпечатком совпасть
+     * может только предмет того же типа, что и пропущенный клик.
+     *
+     * Открытый бокс совпасть не может в принципе: вложенные шалкеры в GUI
+     * не пускает canEnterShulker, а на самом боксе стоит метка сессии -
+     * ее проверка выполняется до маркера и блокирует выброс безусловно.
+     */
+    private record DropMarker(long markedAt, @NotNull Material type, int maxAmount) {
+    }
+
+    private final Map<UUID, DropMarker> allowedDrops = new ConcurrentHashMap<>();
 
     private final SessionRegistry sessionRegistry;
     private final ShulkerValidationService validationService;
     private final MessageService messageService;
 
-    public ShulkerGuardListener(@NotNull NeyShulker plugin) {
+    public ShulkerGuardListener(@NotNull SessionRegistry sessionRegistry,
+                                @NotNull ShulkerValidationService validationService,
+                                @NotNull MessageService messageService) {
 
-        this.sessionRegistry = plugin.getServices().getSessionRegistry();
-        this.validationService = plugin.getServices().getValidationService();
-        this.messageService = plugin.getServices().getMessageService();
+        this.sessionRegistry = sessionRegistry;
+        this.validationService = validationService;
+        this.messageService = messageService;
 
     }
 
     @EventHandler(priority = EventPriority.NORMAL, ignoreCancelled = true)
     public void onInventoryClick(@NotNull InventoryClickEvent event) {
+
+        if (!isPluginGui(event.getInventory().getHolder())) {
+            return;
+        }
 
         ShulkerSession session = sessionRegistry.getSessionByInventory(event.getInventory());
 
@@ -133,6 +159,10 @@ public class ShulkerGuardListener implements Listener {
     @EventHandler(priority = EventPriority.NORMAL, ignoreCancelled = true)
     public void onInventoryDrag(@NotNull InventoryDragEvent event) {
 
+        if (!isPluginGui(event.getInventory().getHolder())) {
+            return;
+        }
+
         ShulkerSession session = sessionRegistry.getSessionByInventory(event.getInventory());
 
         if (session == null || !(event.getWhoClicked() instanceof Player player)) {
@@ -164,24 +194,36 @@ public class ShulkerGuardListener implements Listener {
     /**
      * Выброс предмета при живом GUI почти всегда легален: содержимое бокса
      * и посторонние предметы выбрасываются из GUI свободно, а сам бокс
-     * заблокирован еще на уровне клика. Маркер пропущенного клика отличает
-     * ванильный выброс из GUI от выброса чужим путем (команда, сторонний
-     * плагин) - только последний может донести сам открытый бокс.
+     * заблокирован еще на уровне клика. Порядок проверок:
+     *
+     * 1. метка сессии на выброшенном предмете - безусловная блокировка:
+     *    открытый бокс не отпускается ни при каких маркерах;
+     * 2. маркер пропущенного клика с совпадающим отпечатком - легальный
+     *    ванильный выброс из GUI или нижнего инвентаря;
+     * 3. legacy-сверка немеченой сессии со стеком слота (страховка).
      */
     @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
     public void onPlayerDropItem(@NotNull PlayerDropItemEvent event) {
 
         Player player = event.getPlayer();
 
-        if (!sessionRegistry.hasSession(player.getUniqueId())) {
-            return;
-        }
+        ShulkerSession session = sessionRegistry.getSession(player.getUniqueId());
 
-        if (consumeAllowedDrop(player)) {
+        if (session == null) {
             return;
         }
 
         ItemStack dropped = event.getItemDrop().getItemStack();
+
+        if (SessionTagger.isSession(dropped, session.sessionId())) {
+            event.setCancelled(true);
+            messageService.send(player, MessageKey.DROP_BLOCKED);
+            return;
+        }
+
+        if (consumeAllowedDrop(player, dropped)) {
+            return;
+        }
 
         if (validationService.isDroppedOpenShulker(player, dropped)) {
             event.setCancelled(true);
@@ -196,7 +238,8 @@ public class ShulkerGuardListener implements Listener {
         Player player = event.getPlayer();
 
         boolean touchesShulker = validationService.isSwapTouchingOpenShulker(player)
-                || validationService.isOpenShulker(player, event.getOffHandItem());
+                || validationService.isOpenShulker(player, event.getOffHandItem())
+                || validationService.isOpenShulker(player, event.getMainHandItem());
 
         if (touchesShulker) {
             event.setCancelled(true);
@@ -205,38 +248,69 @@ public class ShulkerGuardListener implements Listener {
 
     }
 
+    private boolean isPluginGui(@Nullable org.bukkit.inventory.InventoryHolder holder) {
+        return holder instanceof NeyShulkerViewer;
+    }
+
     /**
-     * Запоминает ванильный выброс, который guard пропустил из GUI:
-     * Q, Ctrl+Q по слоту или клик мимо окна с предметом на курсоре.
-     * Следом за таким кликом приходит легальный PlayerDropItemEvent.
-     * Без метки идентичный бокс-близнец из соседнего слота неотличим
-     * от открытого, и охранник заблокировал бы посторонний выброс.
+     * Запоминает ванильный выброс, который guard пропустил: Q, Ctrl+Q по слоту
+     * или клик мимо окна с предметом на курсоре. Маркер несет отпечаток
+     * ожидаемого дропа (тип и количество), поэтому следующий за кликом
+     * PlayerDropItemEvent сверяется не только по времени.
      */
     private void rememberAllowedDrop(@NotNull Player player, @NotNull InventoryClickEvent event) {
 
         ClickType click = event.getClick();
-        boolean throwFromSlot = click == ClickType.DROP || click == ClickType.CONTROL_DROP;
-        boolean throwFromCursor = event.getRawSlot() < 0 && !ShulkerUtil.isEmpty(event.getCursor());
 
-        if (!throwFromSlot && !throwFromCursor) {
+        ItemStack source = null;
+        int maxAmount = 0;
+
+        if (click == ClickType.DROP || click == ClickType.CONTROL_DROP) {
+
+            source = event.getCurrentItem();
+            maxAmount = click == ClickType.DROP ? 1 : amountOf(source);
+
+        } else if (event.getRawSlot() < 0 && !ShulkerUtil.isEmpty(event.getCursor())) {
+
+            source = event.getCursor();
+            maxAmount = amountOf(source);
+
+        }
+
+        if (source == null || ShulkerUtil.isEmpty(source) || maxAmount <= 0) {
             return;
         }
 
         long now = System.currentTimeMillis();
 
-        allowedDrops.put(player.getUniqueId(), now);
-        allowedDrops.entrySet().removeIf(entry -> now - entry.getValue() > DROP_MARKER_WINDOW_MILLIS);
+        allowedDrops.put(player.getUniqueId(), new DropMarker(now, source.getType(), maxAmount));
+        allowedDrops.values().removeIf(marker -> now - marker.markedAt() > DROP_MARKER_WINDOW_MILLIS);
 
     }
 
     /**
-     * Снимает метку пропущенного клика: выброс пришел из GUI и легален.
+     * Снимает метку пропущенного клика: выброс пришел из GUI и легален,
+     * если отпечаток дропа совпадает с ожидаемым.
      */
-    private boolean consumeAllowedDrop(@NotNull Player player) {
+    private boolean consumeAllowedDrop(@NotNull Player player, @Nullable ItemStack dropped) {
 
-        Long markedAt = allowedDrops.remove(player.getUniqueId());
-        return markedAt != null && System.currentTimeMillis() - markedAt <= DROP_MARKER_WINDOW_MILLIS;
+        DropMarker marker = allowedDrops.remove(player.getUniqueId());
 
+        if (marker == null || dropped == null) {
+            return false;
+        }
+
+        if (System.currentTimeMillis() - marker.markedAt() > DROP_MARKER_WINDOW_MILLIS) {
+            return false;
+        }
+
+        return dropped.getType() == marker.type()
+                && dropped.getAmount() <= marker.maxAmount();
+
+    }
+
+    private int amountOf(@Nullable ItemStack item) {
+        return item == null ? 0 : item.getAmount();
     }
 
     /**
@@ -264,17 +338,21 @@ public class ShulkerGuardListener implements Listener {
      */
     private @Nullable ItemStack enteringItem(@NotNull Player player,
                                              @NotNull InventoryClickEvent event) {
+
         return switch (event.getClick()) {
+
             case NUMBER_KEY -> event.getHotbarButton() >= 0
                     ? player.getInventory().getItem(event.getHotbarButton())
                     : null;
 
             case SWAP_OFFHAND -> player.getInventory().getItemInOffHand();
             default -> event.getCursor();
+
         };
+
     }
 
-    private boolean isDisallowed(@NotNull Player player, ItemStack item) {
+    private boolean isDisallowed(@NotNull Player player, @Nullable ItemStack item) {
         return !validationService.canEnterShulker(player, item).isAllowed();
     }
 
@@ -309,7 +387,6 @@ public class ShulkerGuardListener implements Listener {
     }
 
     private void cancel(@NotNull InventoryDragEvent event,
-
                         @NotNull Player player,
                         @NotNull ValidationResult result) {
 

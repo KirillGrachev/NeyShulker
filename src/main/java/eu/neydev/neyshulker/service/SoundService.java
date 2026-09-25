@@ -1,6 +1,6 @@
 package eu.neydev.neyshulker.service;
 
-import eu.neydev.neyshulker.config.ConfigManager;
+import eu.neydev.neyshulker.config.NeyShulkerConfig;
 import eu.neydev.neyshulker.config.type.SoundSettings;
 import org.bukkit.entity.Player;
 import org.jetbrains.annotations.NotNull;
@@ -11,10 +11,10 @@ import org.jetbrains.annotations.Nullable;
  */
 public class SoundService {
 
-    private final ConfigManager configManager;
+    private final NeyShulkerConfig config;
 
-    public SoundService(ConfigManager configManager) {
-        this.configManager = configManager;
+    public SoundService(@NotNull NeyShulkerConfig config) {
+        this.config = config;
     }
 
     /**
@@ -38,15 +38,15 @@ public class SoundService {
     }
 
     public void playOpen(@Nullable Player player) {
-        play(player, configManager.getOpenSound());
+        play(player, config.getOpenSound());
     }
 
     public void playClose(@Nullable Player player) {
-        play(player, configManager.getCloseSound());
+        play(player, config.getCloseSound());
     }
 
     public void playCollect(@Nullable Player player) {
-        play(player, configManager.getCollectSound());
+        play(player, config.getCollectSound());
     }
 
 }

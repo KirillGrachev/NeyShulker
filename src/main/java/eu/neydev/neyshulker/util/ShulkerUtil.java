@@ -8,6 +8,7 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.EnumSet;
+import java.util.Locale;
 import java.util.Set;
 
 /**
@@ -201,6 +202,30 @@ public final class ShulkerUtil {
     }
 
     /**
+     * Считает свободные слоты живого инвентаря (открытое GUI).
+     *
+     * @param inventory инвентарь сессии
+     * @return число свободных слотов
+     */
+    public static int countFreeSlots(@Nullable org.bukkit.inventory.Inventory inventory) {
+
+        if (inventory == null) {
+            return 0;
+        }
+
+        int freeSlots = 0;
+
+        for (int i = 0; i < inventory.getSize(); i++) {
+            if (isEmpty(inventory.getItem(i))) {
+                freeSlots++;
+            }
+        }
+
+        return freeSlots;
+
+    }
+
+    /**
      * Считает общее количество предметов в шалкер-боксе.
      *
      * @param shulker предмет шалкер-бокса
@@ -214,9 +239,52 @@ public final class ShulkerUtil {
             return 0;
         }
 
+        return countItems(contents);
+
+    }
+
+    /**
+     * Считает общее количество предметов по готовому содержимому.
+     *
+     * @param contents содержимое бокса (может быть null)
+     * @return суммарный размер всех стопок
+     */
+    public static int countItems(ItemStack @Nullable [] contents) {
+
+        if (contents == null) {
+            return 0;
+        }
+
         int amount = 0;
 
         for (ItemStack itemStack : contents) {
+            if (!isEmpty(itemStack)) {
+                amount += itemStack.getAmount();
+            }
+        }
+
+        return amount;
+
+    }
+
+    /**
+     * Считает общее количество предметов живого инвентаря (открытое GUI).
+     *
+     * @param inventory инвентарь сессии
+     * @return суммарный размер всех стопок
+     */
+    public static int countItems(@Nullable org.bukkit.inventory.Inventory inventory) {
+
+        if (inventory == null) {
+            return 0;
+        }
+
+        int amount = 0;
+
+        for (int i = 0; i < inventory.getSize(); i++) {
+
+            ItemStack itemStack = inventory.getItem(i);
+
             if (!isEmpty(itemStack)) {
                 amount += itemStack.getAmount();
             }
@@ -252,7 +320,7 @@ public final class ShulkerUtil {
      */
     public static @NotNull String prettifyMaterial(@NotNull Material material) {
 
-        String[] words = material.name().toLowerCase().split("_");
+        String[] words = material.name().toLowerCase(Locale.ROOT).split("_");
         StringBuilder result = new StringBuilder();
 
         for (String word : words) {

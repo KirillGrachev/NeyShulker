@@ -17,25 +17,37 @@ public class InventoryTransferService {
     /**
      * Вставляет предмет в инвентарь.
      *
-     * @param player      игрок, которому нужно обновить клиент
+     * @param player      игрок, которому нужно обновить клиент (null - resync
+     *                    не выполняется; пакетные операции синхронизируют окно
+     *                    сами, один раз на пачку)
      * @param destination целевой инвентарь
-     * @param item        вставляемый предмет
+     * @param item        вставляемый предмет (не изменяется)
      * @return количество вставленных предметов
      */
     public int insert(@Nullable Player player,
                       @NotNull Inventory destination,
                       @NotNull ItemStack item) {
 
-        ItemStack[] snapshot = snapshotOf(destination.getSize(), destination::getItem);
+        int size = destination.getSize();
+        ItemStack[] snapshot = new ItemStack[size];
+        ItemStack[] originals = new ItemStack[size];
+
+        for (int i = 0; i < size; i++) {
+            snapshot[i] = destination.getItem(i);
+            originals[i] = snapshot[i];
+        }
+
         int inserted = insertInto(snapshot, item);
 
         if (inserted <= 0) {
             return 0;
         }
 
-        // Фиксация снимка обратно в инвентарь одним проходом
-        for (int i = 0; i < snapshot.length; i++) {
-            destination.setItem(i, snapshot[i]);
+        // Фиксация только измененных слотов: нетронутые ячейки не перезаписываются
+        for (int i = 0; i < size; i++) {
+            if (snapshot[i] != originals[i]) {
+                destination.setItem(i, snapshot[i]);
+            }
         }
 
         resync(player);
@@ -44,8 +56,8 @@ public class InventoryTransferService {
     }
 
     /**
-     * Вставляет предмет в массив слотов (используется для шалкер-боксов,
-     * которые лежат в инвентаре и не имеют собственного Inventory).
+     * Вставляет предмет в массив слотов (исходит из того, что массив может
+     * заменять элементы; сам переданный предмет не изменяется).
      *
      * @param slots массив слотов, изменяется на месте
      * @param item  вставляемый предмет
@@ -53,20 +65,10 @@ public class InventoryTransferService {
      */
     public int insertInto(ItemStack @NotNull [] slots, @NotNull ItemStack item) {
 
-        ItemStack rest = ItemStackTransaction.insert(slots, item.clone(), slots.length);
+        // ItemStackTransaction.insert сам работает с клоном предмета,
+        // поэтому дополнительная копия на входе не нужна
+        ItemStack rest = ItemStackTransaction.insert(slots, item, slots.length);
         return item.getAmount() - (rest == null ? 0 : rest.getAmount());
-
-    }
-
-    private ItemStack @NotNull [] snapshotOf(int size, @NotNull java.util.function.IntFunction<ItemStack> getter) {
-
-        ItemStack[] snapshot = new ItemStack[size];
-
-        for (int i = 0; i < size; i++) {
-            snapshot[i] = getter.apply(i);
-        }
-
-        return snapshot;
 
     }
 

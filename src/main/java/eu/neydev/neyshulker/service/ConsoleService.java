@@ -4,18 +4,38 @@ import eu.neydev.neyshulker.config.type.ConsoleMessage;
 import eu.neydev.neyshulker.util.HexColorUtil;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
+
+import java.util.EnumMap;
+import java.util.List;
+import java.util.Map;
 
 /**
  * Сервис сообщений консоли.
  *
- * Шаблоны берутся из конфигурации (messages.console.*), поэтому владелец
- * сервера может переформулировать предупреждения без пересборки.
- * Плейсхолдеры {key} подставляются парами аргументов: "key", "value".
+ * Шаблоны зашиты в код ({@link ConsoleMessage}) и готовятся один раз
+ * при загрузке класса: окрашены, разрезаны на строки, неизменяемы.
+ * Конфигурация не читается вовсе - диагностику нельзя выключить или
+ * переписать из config.yml (см. javadoc {@link ConsoleMessage}).
+ * Плейсхолдеры {key} подставляются парами аргументов: "ключ", "значение".
  */
 public class ConsoleService {
 
-    private static final String PATH_CONSOLE = "messages.console.";
+    /** Окрашенные шаблоны: цвет считается один раз, а не на каждое предупреждение. */
+    private static final Map<ConsoleMessage, List<String>> TEMPLATES;
+
+    static {
+
+        Map<ConsoleMessage, List<String>> templates = new EnumMap<>(ConsoleMessage.class);
+
+        for (ConsoleMessage message : ConsoleMessage.values()) {
+            templates.put(message,
+                    List.of(HexColorUtil.color(message.getDefaultTemplate()).split("\n")));
+        }
+
+        TEMPLATES = Map.copyOf(templates);
+
+    }
+
     private final JavaPlugin plugin;
 
     public ConsoleService(@NotNull JavaPlugin plugin) {
@@ -25,45 +45,14 @@ public class ConsoleService {
     /**
      * Печатает предупреждение в консоль по шаблону сообщения.
      *
-     * @param message    ключ сообщения
+     * @param message      ключ сообщения
      * @param placeholders пары "ключ", "значение"
      */
     public void log(@NotNull ConsoleMessage message, @NotNull String... placeholders) {
 
-        org.bukkit.configuration.ConfigurationSection section =
-                plugin.getConfig().getConfigurationSection(PATH_CONSOLE + message.getConfigKey());
-
-        boolean enabled = section != null
-                ? section.getBoolean("enabled", message.isDefaultEnabled())
-                : message.isDefaultEnabled();
-
-        if (!enabled) {
-            return;
+        for (String line : TEMPLATES.get(message)) {
+            plugin.getLogger().warning(applyPlaceholders(line, placeholders));
         }
-
-        String rawTemplate = section != null
-                ? section.getString("text", message.getDefaultTemplate())
-                : plugin.getConfig().getString(PATH_CONSOLE + message.getConfigKey(),
-                        message.getDefaultTemplate());
-
-        for (String line : readLines(section, rawTemplate)) {
-            plugin.getLogger().warning(HexColorUtil.color(applyPlaceholders(line, placeholders)));
-        }
-
-    }
-
-    /**
-     * Читает текст сообщения в общем формате: список строк или одиночная
-     * строка (включая block-scalar). Пустые строки сохраняются как разделители.
-     */
-    private @NotNull java.util.List<String> readLines(@Nullable org.bukkit.configuration.ConfigurationSection section,
-                                                      @NotNull String fallback) {
-
-        if (section != null && section.isList("text")) {
-            return section.getStringList("text");
-        }
-
-        return java.util.List.of(fallback.split("\n"));
 
     }
 

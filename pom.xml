@@ -7,19 +7,29 @@
 
     <groupId>eu.neydev</groupId>
     <artifactId>NeyShulker</artifactId>
-    <version>2.14.5</version>
+    <version>2.15.1</version>
     <packaging>jar</packaging>
 
     <name>NeyShulker</name>
     <description>Portable shulker boxes with anti-dupe protection and auto-collect</description>
+
+    <licenses>
+        <license>
+            <name>MIT License</name>
+            <url>https://opensource.org/licenses/MIT</url>
+            <distribution>repo</distribution>
+        </license>
+    </licenses>
 
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <maven.compiler.release>21</maven.compiler.release>
         <spigot.version>1.20.6-R0.1-SNAPSHOT</spigot.version>
         <placeholderapi.version>2.11.6</placeholderapi.version>
-        <!-- Минимально допустимое покрытие строк; поднимается по мере роста тестов -->
-        <jacoco.line.minimum>0.35</jacoco.line.minimum>
+        <!-- Порог покрытия строк: храповик стоит у фактического уровня (~95%),
+             регресс тестов роняет сборку вместо тихого сползания вниз -->
+        <jacoco.line.minimum>0.90</jacoco.line.minimum>
+        <errorprone.version>2.36.0</errorprone.version>
     </properties>
 
     <repositories>
@@ -31,9 +41,24 @@
             <id>extendedclip-repo</id>
             <url>https://repo.extendedclip.com/releases/</url>
         </repository>
+        <!-- MockBukkit (тесты) резолвит paper-api из репозитория PaperMC -->
+        <repository>
+            <id>papermc-repo</id>
+            <url>https://repo.papermc.io/repository/maven-public/</url>
+        </repository>
     </repositories>
 
     <dependencies>
+        <!-- Тестовый classpath возглавляет paper-api: MockBukkit собран против
+             Paper и требует его реализаций (SimpleCommandMap и др.). Основной
+             код по-прежнему компилируется против spigot-api (provided ниже) -
+             paper-api лишь суперсет для окружения тестов. -->
+        <dependency>
+            <groupId>io.papermc.paper</groupId>
+            <artifactId>paper-api</artifactId>
+            <version>1.20.6-R0.1-SNAPSHOT</version>
+            <scope>test</scope>
+        </dependency>
         <dependency>
             <groupId>org.spigotmc</groupId>
             <artifactId>spigot-api</artifactId>
@@ -66,6 +91,14 @@
             <version>5.14.2</version>
             <scope>test</scope>
         </dependency>
+        <!-- Интеграционные тесты на живом диспетчере событий и моках сервера:
+             загрузка плагина, слушатели, команды, открытие GUI -->
+        <dependency>
+            <groupId>com.github.seeseemelk</groupId>
+            <artifactId>MockBukkit-v1.20</artifactId>
+            <version>3.93.2</version>
+            <scope>test</scope>
+        </dependency>
     </dependencies>
 
     <build>
@@ -81,6 +114,34 @@
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-compiler-plugin</artifactId>
                 <version>3.13.0</version>
+                <configuration>
+                    <!-- ErrorProne: машинная ловля dead-кода, гонок и nullable-ошибок
+                         вместо ручных ревизий стиля. Профиль errorprone-off отключает
+                         его локально, если нужно собрать jar без проверок. -->
+                    <fork>true</fork>
+                    <compilerArgs>
+                        <arg>-XDcompilePolicy=simple</arg>
+                        <arg>--should-stop=ifError=FLOW</arg>
+                        <arg>-Xplugin:ErrorProne</arg>
+                        <arg>-J--add-exports=jdk.compiler/com.sun.tools.javac.api=ALL-UNNAMED</arg>
+                        <arg>-J--add-exports=jdk.compiler/com.sun.tools.javac.file=ALL-UNNAMED</arg>
+                        <arg>-J--add-exports=jdk.compiler/com.sun.tools.javac.main=ALL-UNNAMED</arg>
+                        <arg>-J--add-exports=jdk.compiler/com.sun.tools.javac.model=ALL-UNNAMED</arg>
+                        <arg>-J--add-exports=jdk.compiler/com.sun.tools.javac.parser=ALL-UNNAMED</arg>
+                        <arg>-J--add-exports=jdk.compiler/com.sun.tools.javac.processing=ALL-UNNAMED</arg>
+                        <arg>-J--add-exports=jdk.compiler/com.sun.tools.javac.tree=ALL-UNNAMED</arg>
+                        <arg>-J--add-exports=jdk.compiler/com.sun.tools.javac.util=ALL-UNNAMED</arg>
+                        <arg>-J--add-opens=jdk.compiler/com.sun.tools.javac.code=ALL-UNNAMED</arg>
+                        <arg>-J--add-opens=jdk.compiler/com.sun.tools.javac.comp=ALL-UNNAMED</arg>
+                    </compilerArgs>
+                    <annotationProcessorPaths>
+                        <path>
+                            <groupId>com.google.errorprone</groupId>
+                            <artifactId>error_prone_core</artifactId>
+                            <version>${errorprone.version}</version>
+                        </path>
+                    </annotationProcessorPaths>
+                </configuration>
             </plugin>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
@@ -130,7 +191,56 @@
                     </execution>
                 </executions>
             </plugin>
+
+            <!-- Гигиена формата без перекомпоновки кода: хвостовые пробелы,
+                 финальный перевод строки, порядок и неиспользуемые импорты.
+                 Домашний стиль (отступы, рамки) остается авторским - spotless
+                 его не трогает, но "релизы про пробелы" больше не нужны. -->
+            <plugin>
+                <groupId>com.diffplug.spotless</groupId>
+                <artifactId>spotless-maven-plugin</artifactId>
+                <version>2.43.0</version>
+                <configuration>
+                    <java>
+                        <trimTrailingWhitespace/>
+                        <endWithNewline/>
+                        <removeUnusedImports/>
+                    </java>
+                    <pom>
+                        <trimTrailingWhitespace/>
+                        <endWithNewline/>
+                    </pom>
+                </configuration>
+                <executions>
+                    <execution>
+                        <id>format-check</id>
+                        <phase>verify</phase>
+                        <goals>
+                            <goal>check</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
         </plugins>
     </build>
+
+    <profiles>
+        <!-- mvn verify -Perrorprone-off: сборка без статического анализатора -->
+        <profile>
+            <id>errorprone-off</id>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-compiler-plugin</artifactId>
+                        <configuration>
+                            <compilerArgs combine.self="override"/>
+                            <annotationProcessorPaths combine.self="override"/>
+                        </configuration>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+    </profiles>
 
 </project>

@@ -1,5 +1,7 @@
 package eu.neydev.neyshulker.service;
 
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import eu.neydev.neyshulker.NeyShulker;
 import eu.neydev.neyshulker.config.ConfigManager;
 import eu.neydev.neyshulker.registry.SessionRegistry;
@@ -7,6 +9,9 @@ import eu.neydev.neyshulker.service.collect.PlayerDropTracker;
 import eu.neydev.neyshulker.util.FakeItemStack;
 import eu.neydev.neyshulker.util.ShulkerUtil;
 import eu.neydev.neyshulker.util.TestInventories;
+import eu.neydev.neyshulker.service.collect.CollectRules;
+import eu.neydev.neyshulker.service.collect.NearbyItemsFinder;
+import static org.mockito.ArgumentMatchers.anyDouble;
 import org.bukkit.Bukkit;
 import org.bukkit.GameMode;
 import org.bukkit.Location;
@@ -234,12 +239,15 @@ class AutoCollectServiceTest {
 
         org.bukkit.World world = mock(org.bukkit.World.class);
 
-        when(world.getEntitiesByClass(Item.class)).thenReturn(List.of(drop));
+        when(world.getNearbyEntities(any(Location.class), anyDouble(), anyDouble(), anyDouble(), any()))
+                .thenReturn(List.of(drop));
         when(player.getWorld()).thenReturn(world);
 
         return new AutoCollectService(plugin, configManager, sessionRegistry,
                 new InventoryTransferService(), persistenceService,
-                messageService, soundService, permissionService, dropTracker);
+                messageService, soundService,
+                new CollectRules(configManager, permissionService, dropTracker),
+                new NearbyItemsFinder(configManager), dropTracker);
 
     }
 
@@ -276,8 +284,8 @@ class AutoCollectServiceTest {
     @DisplayName("Шалкер во второй руке - полноценная цель сбора")
     void offHandShulkerIsCollectTarget() {
 
-        when(playerInventory.getContents()).thenReturn(new ItemStack[0]);
-        when(playerInventory.getItem(ShulkerUtil.OFF_HAND_SLOT)).thenReturn(shulker);
+        // Карта слотов согласована с getContents/getItem: бокс во второй руке
+        playerInventory.setItem(ShulkerUtil.OFF_HAND_SLOT, shulker);
 
         Server server = mock(Server.class);
         PluginManager pluginManager = mock(PluginManager.class);
@@ -292,7 +300,9 @@ class AutoCollectServiceTest {
         }
 
         verify(drop).remove();
-        verify(playerInventory).setItem(eq(ShulkerUtil.OFF_HAND_SLOT), any());
+        // flush записал обновленный бокс обратно во вторую руку
+        verify(playerInventory, org.mockito.Mockito.atLeastOnce())
+                .setItem(eq(ShulkerUtil.OFF_HAND_SLOT), any());
 
     }
 
@@ -384,7 +394,8 @@ class AutoCollectServiceTest {
         // Мир с двумя дропами stub-ится после сервиса: service() ставит свой мир
         org.bukkit.World world = mock(org.bukkit.World.class);
 
-        when(world.getEntitiesByClass(Item.class)).thenReturn(List.of(drop, second));
+        when(world.getNearbyEntities(any(Location.class), anyDouble(), anyDouble(), anyDouble(), any()))
+                .thenReturn(List.of(drop, second));
         when(player.getWorld()).thenReturn(world);
 
         PluginManager pluginManager = mock(PluginManager.class);
@@ -432,6 +443,36 @@ class AutoCollectServiceTest {
 
         service.collectAround(player);
         verify(drop, never()).remove();
+
+    }
+
+    @Test
+    @DisplayName("Полный инвентарь с only_full_inventory=true: сбор работает")
+    void fullInventoryGateAllowsCollectionWhenInventoryIsFull() {
+
+        when(configManager.isAutoCollectOnlyWhenInventoryFull()).thenReturn(true);
+
+        // Слот 0 - приемный бокс, остальные слоты хранения забиты: гейт открыт
+        playerInventory.setItem(0, shulker);
+
+        for (int slot = 1; slot < ShulkerUtil.PLAYER_STORAGE_SLOTS; slot++) {
+            playerInventory.setItem(slot, new FakeItemStack(Material.DIRT, 64));
+        }
+
+        when(playerInventory.getContents()).thenReturn(new ItemStack[]{shulker});
+
+        AutoCollectService service = service();
+
+        PluginManager pluginManager = mock(PluginManager.class);
+
+        try (MockedStatic<Bukkit> bukkit = mockStatic(Bukkit.class)) {
+
+            bukkit.when(Bukkit::getPluginManager).thenReturn(pluginManager);
+            service.collectAround(player);
+
+        }
+
+        verify(drop).remove();
 
     }
 
@@ -507,7 +548,8 @@ class AutoCollectServiceTest {
         // Мир stub-ится после сервиса: service() ставит свой мир по умолчанию
         org.bukkit.World world = mock(org.bukkit.World.class);
 
-        when(world.getEntitiesByClass(Item.class)).thenReturn(List.of(drop, dirt));
+        when(world.getNearbyEntities(any(Location.class), anyDouble(), anyDouble(), anyDouble(), any()))
+                .thenReturn(List.of(drop, dirt));
         when(player.getWorld()).thenReturn(world);
 
         PluginManager pluginManager = mock(PluginManager.class);
@@ -546,7 +588,8 @@ class AutoCollectServiceTest {
         AutoCollectService service = service();
         org.bukkit.World world = mock(org.bukkit.World.class);
 
-        when(world.getEntitiesByClass(Item.class)).thenReturn(List.of());
+        when(world.getNearbyEntities(any(Location.class), anyDouble(), anyDouble(), anyDouble(), any()))
+                .thenReturn(List.of());
         when(player.getWorld()).thenReturn(world);
         PluginManager pluginManager = mock(PluginManager.class);
 
@@ -588,7 +631,8 @@ class AutoCollectServiceTest {
 
         org.bukkit.World world = mock(org.bukkit.World.class);
 
-        when(world.getEntitiesByClass(Item.class)).thenReturn(List.of());
+        when(world.getNearbyEntities(any(Location.class), anyDouble(), anyDouble(), anyDouble(), any()))
+                .thenReturn(List.of());
         when(player.getWorld()).thenReturn(world);
 
         PluginManager pluginManager = mock(PluginManager.class);
@@ -618,7 +662,8 @@ class AutoCollectServiceTest {
         AutoCollectService service = service();
         org.bukkit.World world = mock(org.bukkit.World.class);
 
-        when(world.getEntitiesByClass(Item.class)).thenReturn(List.of());
+        when(world.getNearbyEntities(any(Location.class), anyDouble(), anyDouble(), anyDouble(), any()))
+                .thenReturn(List.of());
         when(player.getWorld()).thenReturn(world);
 
         when(configManager.getAutoCollectMode())
@@ -653,7 +698,8 @@ class AutoCollectServiceTest {
                 .thenReturn(eu.neydev.neyshulker.config.type.CollectMode.MATCHING);
 
         org.bukkit.World world = mock(org.bukkit.World.class);
-        when(world.getEntitiesByClass(Item.class)).thenReturn(List.of(drop));
+        when(world.getNearbyEntities(any(Location.class), anyDouble(), anyDouble(), anyDouble(), any()))
+                .thenReturn(List.of(drop));
         when(player.getWorld()).thenReturn(world);
         PluginManager pluginManager = mock(PluginManager.class);
 
@@ -676,6 +722,178 @@ class AutoCollectServiceTest {
         when(playerInventory.getContents()).thenReturn(new ItemStack[0]);
         service().collectAround(player);
         verify(drop, never()).remove();
+
+    }
+
+
+    @Test
+    @DisplayName("toggle: выключил-включил, isEnabledFor отражает состояние")
+    void toggleRoundTrip() {
+
+        AutoCollectService service = service();
+
+        assertTrue(service.isEnabledFor(player));
+        assertFalse(service.toggle(player), "Первый toggle выключает");
+        assertFalse(service.isEnabledFor(player));
+        assertTrue(service.toggle(player), "Второй toggle включает");
+        assertTrue(service.isEnabledFor(player));
+
+    }
+
+    @Test
+    @DisplayName("forget очищает тумблер и очередь игрока")
+    void forgetResetsPlayerState() {
+
+        AutoCollectService service = service();
+
+        service.toggle(player);
+        assertFalse(service.isEnabledFor(player));
+
+        service.forget(player);
+
+        assertTrue(service.isEnabledFor(player));
+        assertEquals(0, service.waitListSize(player));
+
+    }
+
+    @Test
+    @DisplayName("Выключенный в конфиге автосбор не стартует")
+    void disabledConfigDoesNotStart() {
+
+        AutoCollectService service = service();
+
+        // Пере-стаб после хелпера: service() сам ставит enabled=true
+        when(configManager.isAutoCollectEnabled()).thenReturn(false);
+
+        service.start();
+        assertFalse(service.isRunning());
+
+    }
+
+    @Test
+    @DisplayName("start/stop/restart управляют волновой задачей")
+    void startStopRestartLifecycle() {
+
+        when(configManager.getWavePeriod()).thenReturn(10);
+        when(configManager.getPlayersPerWave()).thenReturn(5);
+
+        AutoCollectService service = service();
+
+        org.bukkit.scheduler.BukkitScheduler scheduler = mock(org.bukkit.scheduler.BukkitScheduler.class);
+        org.bukkit.scheduler.BukkitTask task = mock(org.bukkit.scheduler.BukkitTask.class);
+
+        when(scheduler.runTaskTimer(any(org.bukkit.plugin.Plugin.class), any(Runnable.class),
+                org.mockito.ArgumentMatchers.anyLong(), org.mockito.ArgumentMatchers.anyLong()))
+                .thenReturn(task);
+
+        try (MockedStatic<Bukkit> bukkit = mockStatic(Bukkit.class)) {
+
+            bukkit.when(Bukkit::getScheduler).thenReturn(scheduler);
+            bukkit.when(Bukkit::isPrimaryThread).thenReturn(true);
+
+            service.start();
+            assertTrue(service.isRunning());
+
+            service.stop();
+            assertFalse(service.isRunning());
+            verify(task).cancel();
+
+            service.restart();
+            assertTrue(service.isRunning(), "restart снова запускает волну");
+
+        }
+
+    }
+
+    @Test
+    @DisplayName("collectAround(null) безопасен")
+    void collectAroundNullIsSafe() {
+        service().collectAround(null);
+    }
+
+    @Test
+    @DisplayName("Успешный сбор отправляет сообщение AUTO_COLLECT с количеством")
+    void collectSendsAmountMessage() {
+
+        playerInventory.setItem(0, shulker);
+        when(playerInventory.getContents()).thenReturn(new ItemStack[]{shulker});
+
+        PluginManager pluginManager = mock(PluginManager.class);
+
+        try (MockedStatic<Bukkit> bukkit = mockStatic(Bukkit.class)) {
+
+            bukkit.when(Bukkit::getPluginManager).thenReturn(pluginManager);
+            service().collectAround(player);
+
+        }
+
+        verify(drop).remove();
+        verify(messageService).send(player,
+                eu.neydev.neyshulker.config.type.MessageKey.AUTO_COLLECT,
+                java.util.Map.of("amount", "3"));
+
+    }
+
+    @Test
+    @DisplayName("Дроп с pickup delay между детекцией и сливом возвращается в голову очереди")
+    void delayedEntryReturnsToWaitListHead() {
+
+        playerInventory.setItem(0, shulker);
+        when(playerInventory.getContents()).thenReturn(new ItemStack[]{shulker});
+
+        when(drop.getPickupDelay()).thenReturn(10);
+
+        AutoCollectService service = service();
+
+        // Пере-стаб после хелпера: детекция игнорирует delay (первый вызов
+        // true), слив - уже нет (второй false)
+        when(configManager.isAutoCollectIgnorePickupDelay()).thenReturn(true, false);
+
+        PluginManager pluginManager = mock(PluginManager.class);
+
+        try (MockedStatic<Bukkit> bukkit = mockStatic(Bukkit.class)) {
+
+            bukkit.when(Bukkit::getPluginManager).thenReturn(pluginManager);
+            service.collectAround(player);
+
+        }
+
+        verify(drop, never()).remove();
+        assertEquals(1, service.waitListSize(player),
+                "Элемент вернулся в лист ожидания следующей волны");
+
+        service.clearWaitList(player);
+        assertEquals(0, service.waitListSize(player));
+
+    }
+
+    @Test
+    @DisplayName("Волна убирает лист ожидания игрока, вышедшего из сети")
+    void drainWaveDropsOfflinePlayerWaitList() {
+
+        playerInventory.setItem(0, shulker);
+        when(playerInventory.getContents()).thenReturn(new ItemStack[]{shulker});
+
+        AutoCollectService service = service();
+
+        when(configManager.getPlayersPerWave()).thenReturn(5);
+        when(configManager.getActionsPerWave()).thenReturn(1);
+
+        PluginManager pluginManager = mock(PluginManager.class);
+
+        try (MockedStatic<Bukkit> bukkit = mockStatic(Bukkit.class)) {
+
+            bukkit.when(Bukkit::getPluginManager).thenReturn(pluginManager);
+            bukkit.when(Bukkit::getOnlinePlayers).thenReturn(List.of(player));
+            // Детекция проходит, а на фазе слива игрок уже "оффлайн"
+            bukkit.when(() -> Bukkit.getPlayer(player.getUniqueId())).thenReturn(null);
+
+            service.wave();
+
+        }
+
+        assertEquals(0, service.waitListSize(player),
+                "Лист ожидания оффлайн-игрока удален");
 
     }
 

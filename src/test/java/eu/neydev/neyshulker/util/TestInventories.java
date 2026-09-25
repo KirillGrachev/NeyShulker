@@ -43,13 +43,20 @@ public final class TestInventories {
             return null;
         }).when(inventory).setItem(anyInt(), any());
 
+        doAnswer(answer -> {
+            slots.clear();
+            return null;
+        }).when(inventory).clear();
+
         return inventory;
 
     }
 
     /**
      * Инвентарь игрока: 41 слот и область хранения на 36 слотов,
-     * как у настоящего PlayerInventory.
+     * как у настоящего PlayerInventory. getStorageContents и getContents
+     * согласованы с той же картой слотов: мок не может «разойтись»
+     * с реальным состоянием, которое видят сервисы.
      *
      * @return мок PlayerInventory
      */
@@ -58,7 +65,6 @@ public final class TestInventories {
         PlayerInventory inventory = mock(PlayerInventory.class);
 
         when(inventory.getSize()).thenReturn(41);
-        when(inventory.getStorageContents()).thenReturn(new ItemStack[36]);
 
         Map<Integer, ItemStack> slots = new HashMap<>();
 
@@ -70,7 +76,22 @@ public final class TestInventories {
             return null;
         }).when(inventory).setItem(anyInt(), any());
 
+        when(inventory.getStorageContents()).thenAnswer(answer -> slice(slots, 36));
+        when(inventory.getContents()).thenAnswer(answer -> slice(slots, 41));
+
         return inventory;
+
+    }
+
+    private static ItemStack[] slice(Map<Integer, ItemStack> slots, int size) {
+
+        ItemStack[] contents = new ItemStack[size];
+
+        for (int i = 0; i < size; i++) {
+            contents[i] = slots.get(i);
+        }
+
+        return contents;
 
     }
 

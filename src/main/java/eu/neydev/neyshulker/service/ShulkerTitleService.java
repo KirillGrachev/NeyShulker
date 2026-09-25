@@ -1,6 +1,6 @@
 package eu.neydev.neyshulker.service;
 
-import eu.neydev.neyshulker.config.ConfigManager;
+import eu.neydev.neyshulker.config.NeyShulkerConfig;
 import eu.neydev.neyshulker.config.type.TitleMode;
 import eu.neydev.neyshulker.util.ShulkerUtil;
 import org.bukkit.entity.Player;
@@ -26,10 +26,10 @@ public class ShulkerTitleService {
     private static final String NAME_PLACEHOLDER = "{shulker_name}";
     private static final String MATERIAL_PLACEHOLDER = "{shulker_material}";
 
-    private final ConfigManager configManager;
+    private final NeyShulkerConfig config;
 
-    public ShulkerTitleService(ConfigManager configManager) {
-        this.configManager = configManager;
+    public ShulkerTitleService(@NotNull NeyShulkerConfig config) {
+        this.config = config;
     }
 
     /**
@@ -49,13 +49,15 @@ public class ShulkerTitleService {
 
         String name = resolveName(viewer, shulker);
 
-        if (configManager.getTitleMode() == TitleMode.ORIGINAL) {
+        if (config.getTitleMode() == TitleMode.ORIGINAL) {
             return name;
         }
 
-        String format = configManager.getTitleFormat();
+        // getTitleFormat() контрактно не возвращает null; пустой шаблон
+        // деградирует в имя шалкера, чтобы GUI не оставался без заголовка
+        String format = config.getTitleFormat();
 
-        if (format == null || format.isBlank()) {
+        if (format.isBlank()) {
             return name;
         }
 
@@ -117,7 +119,7 @@ public class ShulkerTitleService {
      */
     private @Nullable String localeName(@Nullable Player viewer) {
 
-        Map<String, String> names = configManager.getTitleNames();
+        Map<String, String> names = config.getTitleNames();
 
         if (names.isEmpty()) {
             return null;

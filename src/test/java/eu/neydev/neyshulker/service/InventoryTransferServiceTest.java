@@ -1,5 +1,6 @@
 package eu.neydev.neyshulker.service;
 
+import static org.mockito.Mockito.when;
 import eu.neydev.neyshulker.util.FakeItemStack;
 import eu.neydev.neyshulker.util.TestInventories;
 import org.bukkit.Material;
@@ -45,6 +46,65 @@ class InventoryTransferServiceTest {
 
         assertEquals(0, inserted);
         assertEquals(64, destination.getItem(0).getAmount());
+
+    }
+
+
+    @Test
+    @DisplayName("Фиксация трогает только измененные слоты")
+    void onlyChangedSlotsAreWrittenBack() {
+
+        Inventory destination = TestInventories.inventory(3);
+
+        destination.setItem(0, new FakeItemStack(Material.DIAMOND, 64));
+        destination.setItem(1, new FakeItemStack(Material.DIAMOND, 60));
+
+        // Раскладка - часть arrange: считаем только записи самой фиксации
+        org.mockito.Mockito.clearInvocations(destination);
+
+        int inserted = transferService.insert(null, destination, new FakeItemStack(Material.DIAMOND, 10));
+
+        assertEquals(10, inserted);
+
+        org.mockito.Mockito.verify(destination, org.mockito.Mockito.never())
+                .setItem(org.mockito.ArgumentMatchers.eq(0), org.mockito.ArgumentMatchers.any());
+        org.mockito.Mockito.verify(destination)
+                .setItem(org.mockito.ArgumentMatchers.eq(1), org.mockito.ArgumentMatchers.any());
+        org.mockito.Mockito.verify(destination)
+                .setItem(org.mockito.ArgumentMatchers.eq(2), org.mockito.ArgumentMatchers.any());
+
+    }
+
+    @Test
+    @DisplayName("Нулевая вставка не трогает инвентарь и не синхронизирует клиента")
+    void zeroInsertIsNoOp() {
+
+        Inventory destination = TestInventories.inventory(1);
+        destination.setItem(0, new FakeItemStack(Material.DIAMOND, 64));
+
+        org.bukkit.entity.Player player = org.mockito.Mockito.mock(org.bukkit.entity.Player.class);
+        when(player.isOnline()).thenReturn(true);
+
+        assertEquals(0, transferService.insert(player, destination,
+                new FakeItemStack(Material.DIAMOND, 1)));
+
+        org.mockito.Mockito.verify(player, org.mockito.Mockito.never()).updateInventory();
+
+    }
+
+    @Test
+    @DisplayName("Онлайн-игрок получает resync после успешной вставки")
+    void onlinePlayerIsResynced() {
+
+        Inventory destination = TestInventories.inventory(3);
+        org.bukkit.entity.Player player = org.mockito.Mockito.mock(org.bukkit.entity.Player.class);
+
+        when(player.isOnline()).thenReturn(true);
+
+        assertEquals(2, transferService.insert(player, destination,
+                new FakeItemStack(Material.DIAMOND, 2)));
+
+        org.mockito.Mockito.verify(player).updateInventory();
 
     }
 

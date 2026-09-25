@@ -3,7 +3,6 @@ package eu.neydev.neyshulker.service.collect;
 import org.bukkit.Material;
 import org.bukkit.entity.Item;
 import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
 
 /**
  * Элемент листа ожидания автосбора.
@@ -12,35 +11,61 @@ import org.jetbrains.annotations.Nullable;
  * или слот инвентаря. Тяжелая работа (выбор цели, вставка, запись меты)
  * отложена до фазы слива, где она дозируется бюджетом действий на волну.
  *
- * @param item     сущность дропа (null для источника из инвентаря)
- * @param slot     слот инвентаря (-1 для источника с земли)
- * @param material тип предмета на момент детекции
+ * Sealed-иерархия вместо nullable-поля и sentinel-слота: источник
+ * однозначно определяется типом, а switch в фазе слива проверяется
+ * компилятором на полноту.
  */
-public record CollectEntry(@Nullable Item item, int slot, @NotNull Material material) {
+public sealed interface CollectEntry permits CollectEntry.Ground, CollectEntry.Slot {
+
+    /**
+     * Тип предмета на момент детекции.
+     */
+    @NotNull Material material();
 
     /**
      * Источник - дроп на земле.
      *
-     * @param item сущность дропа
-     * @return элемент листа ожидания
+     * @param item     сущность дропа
+     * @param material тип предмета на момент детекции
      */
-    public static @NotNull CollectEntry ground(@NotNull Item item) {
-        return new CollectEntry(item, -1, item.getItemStack().getType());
+    record Ground(@NotNull Item item, @NotNull Material material) implements CollectEntry {
     }
 
     /**
-     * Источник - слот инвентаря игрока.
+     * Источник - слот области хранения инвентаря игрока.
+     *
+     * @param slot     слот хранения (0..35)
+     * @param material тип предмета в слоте на момент детекции
+     */
+    record Slot(int slot, @NotNull Material material) implements CollectEntry {
+    }
+
+    /**
+     * Создает элемент для дропа на земле.
+     *
+     * @param item сущность дропа
+     * @return элемент листа ожидания
+     */
+    static @NotNull CollectEntry ground(@NotNull Item item) {
+        return new Ground(item, item.getItemStack().getType());
+    }
+
+    /**
+     * Создает элемент для слота инвентаря игрока.
      *
      * @param slot     слот хранения
      * @param material тип предмета в слоте
      * @return элемент листа ожидания
      */
-    public static @NotNull CollectEntry inventory(int slot, @NotNull Material material) {
-        return new CollectEntry(null, slot, material);
+    static @NotNull CollectEntry inventory(int slot, @NotNull Material material) {
+        return new Slot(slot, material);
     }
 
-    public boolean isGround() {
-        return item != null;
+    /**
+     * @return true для источника «дроп на земле»
+     */
+    default boolean isGround() {
+        return this instanceof Ground;
     }
 
 }

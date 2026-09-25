@@ -39,7 +39,7 @@ class RepeatingTaskTest {
             bukkit.when(Bukkit::getScheduler).thenReturn(scheduler);
             bukkit.when(Bukkit::isPrimaryThread).thenReturn(true);
 
-            RepeatingTask repeating = new RepeatingTask(plugin, "test", () -> {
+            RepeatingTask repeating = new RepeatingTask(plugin, () -> {
             });
 
             assertFalse(repeating.isRunning());
@@ -75,10 +75,66 @@ class RepeatingTaskTest {
             bukkit.when(Bukkit::getScheduler).thenReturn(scheduler);
             bukkit.when(Bukkit::isPrimaryThread).thenReturn(true);
 
-            new RepeatingTask(plugin, "test", () -> {
+            new RepeatingTask(plugin, () -> {
             }).start(0L, -5L);
 
             verify(scheduler).runTaskTimer(eq(plugin), any(Runnable.class), eq(1L), eq(1L));
+
+        }
+
+    }
+
+
+    @Test
+    @DisplayName("Старт не из главного потока уезжает задачей в главный")
+    void asyncStartReschedulesToMainThread() {
+
+        org.bukkit.scheduler.BukkitScheduler scheduler = mock(org.bukkit.scheduler.BukkitScheduler.class);
+        Plugin plugin = mock(Plugin.class);
+
+        try (MockedStatic<Bukkit> bukkit = mockStatic(Bukkit.class)) {
+
+            bukkit.when(Bukkit::getScheduler).thenReturn(scheduler);
+            bukkit.when(Bukkit::isPrimaryThread).thenReturn(false);
+
+            RepeatingTask repeating = new RepeatingTask(plugin, () -> {
+            });
+            repeating.start(5L, 5L);
+
+            // Прямой регистрации таймера нет - вместо нее задача на главный поток
+            verify(scheduler, org.mockito.Mockito.never())
+                    .runTaskTimer(any(Plugin.class), any(Runnable.class), anyLong(), anyLong());
+            verify(scheduler).runTask(eq(plugin), any(Runnable.class));
+            assertFalse(repeating.isRunning());
+
+        }
+
+    }
+
+    @Test
+    @DisplayName("Внешняя отмена задачи честно отражается в isRunning")
+    void externalCancelIsVisible() {
+
+        org.bukkit.scheduler.BukkitScheduler scheduler = mock(org.bukkit.scheduler.BukkitScheduler.class);
+        org.bukkit.scheduler.BukkitTask task = mock(org.bukkit.scheduler.BukkitTask.class);
+        Plugin plugin = mock(Plugin.class);
+
+        when(scheduler.runTaskTimer(any(Plugin.class), any(Runnable.class), anyLong(), anyLong()))
+                .thenReturn(task);
+
+        try (MockedStatic<Bukkit> bukkit = mockStatic(Bukkit.class)) {
+
+            bukkit.when(Bukkit::getScheduler).thenReturn(scheduler);
+            bukkit.when(Bukkit::isPrimaryThread).thenReturn(true);
+
+            RepeatingTask repeating = new RepeatingTask(plugin, () -> {
+            });
+            repeating.start(1L, 1L);
+            assertTrue(repeating.isRunning());
+
+            // Планировщик отменил задачу сам (например, выключение сервера)
+            when(task.isCancelled()).thenReturn(true);
+            assertFalse(repeating.isRunning());
 
         }
 

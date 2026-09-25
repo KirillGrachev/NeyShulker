@@ -4,47 +4,35 @@ import org.jetbrains.annotations.NotNull;
 
 /**
  * Ключи сообщений консоли.
- * Шаблоны читаются из конфигурации (messages.console.*), плейсхолдеры
- * подставляются по принципу "ключ", "значение" парами.
+ *
+ * Шаблоны зашиты в код и не читаются из конфигурации - осознанно:
+ * предупреждения о битых значениях, неизвестных материалах и устаревших
+ * путях это диагностика, а не контент. Если бы ими владел config.yml,
+ * серверовладелец мог бы выключить их одним флагом (или вырезать секцию),
+ * и плагин начал бы молча работать на дефолтах - ровно в тот момент,
+ * когда предупреждения нужнее всего. Плейсхолдеры {key} подставляются
+ * парами аргументов: "ключ", "значение".
  */
 public enum ConsoleMessage {
 
-    UNKNOWN_SOUND("unknown_sound", true,
-            "&eUnknown sound at {path}: '{value}'. Using {defaultValue}."),
+    UNKNOWN_SOUND("&eUnknown sound at {path}: '{value}'. Using {defaultValue}."),
 
-    UNKNOWN_MATERIAL("unknown_material", true,
-            "&eUnknown material at {path}: '{value}'. Skipped."),
+    UNKNOWN_MATERIAL("&eUnknown material at {path}: '{value}'. Skipped."),
 
-    INVALID_VALUE("invalid_value", true,
-            "&eInvalid value at {path}: '{value}'. Using {defaultValue}."),
+    UNKNOWN_GAME_MODE("&eUnknown game mode at {path}: '{value}'. Skipped."),
 
-    LEGACY_PATH("legacy_path", true,
-            "&eLegacy config path {path}: use {replacement} instead."),
+    INVALID_VALUE("&eInvalid value at {path}: '{value}'. Using {defaultValue}."),
 
-    COMMAND_MISSING("command_missing", true,
-            "&eCommand {command} is missing from plugin.yml."),
+    LEGACY_PATH("&eLegacy config path {path}: use {replacement} instead."),
 
-    COMMAND_UNREGISTER_FAILED("command_unregister_failed", true,
-            "&eFailed to unregister command {command}: {reason}.");
+    COMMAND_MISSING("&eCommand {command} is missing from plugin.yml."),
 
-    private final String configKey;
-    private final boolean defaultEnabled;
+    COMMAND_UNREGISTER_FAILED("&eFailed to unregister command {command}: {reason}.");
+
     private final String defaultTemplate;
 
-    ConsoleMessage(String configKey, boolean defaultEnabled, String defaultTemplate) {
-
-        this.configKey = configKey;
-        this.defaultEnabled = defaultEnabled;
+    ConsoleMessage(String defaultTemplate) {
         this.defaultTemplate = defaultTemplate;
-
-    }
-
-    public @NotNull String getConfigKey() {
-        return configKey;
-    }
-
-    public boolean isDefaultEnabled() {
-        return defaultEnabled;
     }
 
     public @NotNull String getDefaultTemplate() {

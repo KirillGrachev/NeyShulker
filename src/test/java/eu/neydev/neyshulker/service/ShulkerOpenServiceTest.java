@@ -1,7 +1,11 @@
 package eu.neydev.neyshulker.service;
 
+import static org.mockito.ArgumentMatchers.eq;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import eu.neydev.neyshulker.NeyShulker;
 import eu.neydev.neyshulker.config.ConfigManager;
+import eu.neydev.neyshulker.config.type.MessageKey;
+import eu.neydev.neyshulker.model.ShulkerSession;
 import eu.neydev.neyshulker.event.ShulkerOpenEvent;
 import eu.neydev.neyshulker.registry.SessionRegistry;
 import eu.neydev.neyshulker.util.TestInventories;
@@ -44,13 +48,17 @@ class ShulkerOpenServiceTest {
     private final MessageService messageService = mock(MessageService.class);
     private final SoundService soundService = mock(SoundService.class);
 
-    private final Player player = player();
-    private final org.bukkit.inventory.Inventory gui = TestInventories.inventory(27);
+    private final org.bukkit.inventory.PlayerInventory playerInventory =
+            TestInventories.playerInventory();
 
-    private static Player player() {
+    private final org.bukkit.inventory.Inventory gui = TestInventories.inventory(27);
+    private final Player player = player();
+
+    private Player player() {
 
         Player player = mock(Player.class);
         when(player.getUniqueId()).thenReturn(java.util.UUID.randomUUID());
+        when(player.getInventory()).thenReturn(playerInventory);
         return player;
 
     }
@@ -152,7 +160,7 @@ class ShulkerOpenServiceTest {
         }
 
         assertNull(sessionRegistry.getSession(player));
-        verify(player).closeInventory();
+        verify(player, never()).openInventory(any(org.bukkit.inventory.Inventory.class));
         verify(persistenceService, never()).scheduleAutoSave(any());
 
     }
@@ -176,6 +184,116 @@ class ShulkerOpenServiceTest {
             assertFalse(service.open(player, shulker(), 3));
 
         }
+
+    }
+
+
+    @Test
+    @DisplayName("open(slot) с не-шалкером отправляет OPEN_ERROR")
+    void openSlotWithNonShulkerSendsError() {
+
+        playerInventory.setItem(2, new eu.neydev.neyshulker.util.FakeItemStack(Material.STONE, 1));
+
+        NeyShulker plugin = pluginWithEvents();
+
+        assertFalse(openService(plugin).open(player, 2));
+        verify(messageService).send(player, MessageKey.OPEN_ERROR, java.util.Map.of());
+
+    }
+
+    @Test
+    @DisplayName("RuntimeException при открытии: severe-лог, OPEN_ERROR, сессия снята")
+    void runtimeExceptionRollsBack() {
+
+        ItemStack exploding = mock(ItemStack.class);
+
+        when(exploding.getType()).thenReturn(Material.WHITE_SHULKER_BOX);
+        when(exploding.clone()).thenThrow(new IllegalStateException("boom"));
+
+        java.util.logging.Logger logger = java.util.logging.Logger.getLogger("open-ex-" + System.nanoTime());
+        java.util.List<java.util.logging.LogRecord> records = new java.util.ArrayList<>();
+
+        logger.setUseParentHandlers(false);
+        logger.addHandler(new java.util.logging.Handler() {
+
+            @Override
+            public void publish(java.util.logging.LogRecord record) {
+                records.add(record);
+            }
+
+            @Override
+            public void flush() {
+            }
+
+            @Override
+            public void close() {
+            }
+        });
+
+        NeyShulker plugin = pluginWithEvents();
+        when(plugin.getLogger()).thenReturn(logger);
+
+        assertFalse(openService(plugin).open(player, exploding, 3));
+
+        assertNull(sessionRegistry.getSession(player));
+        verify(messageService).send(player, MessageKey.OPEN_ERROR, java.util.Map.of());
+        assertEquals(1, records.size());
+        assertEquals(java.util.logging.Level.SEVERE, records.get(0).getLevel());
+        assertNotNull(records.get(0).getThrown(), "Стектрейс исключения обязателен");
+
+    }
+
+    @Test
+    @DisplayName("При открытии предмет в слоте помечается меткой сессии")
+    void openTagsLiveSlotItem() {
+
+        when(configManager.getTitleMode()).thenReturn(eu.neydev.neyshulker.config.type.TitleMode.CUSTOM);
+        when(configManager.getTitleFormat()).thenReturn("{shulker_name}");
+        when(configManager.getTitleNames()).thenReturn(java.util.Map.of());
+
+        // Мок с рабочей PDC-цепочкой: метка реально пишется
+        org.bukkit.inventory.meta.BlockStateMeta meta = mock(org.bukkit.inventory.meta.BlockStateMeta.class);
+        org.bukkit.block.ShulkerBox box = mock(org.bukkit.block.ShulkerBox.class);
+        org.bukkit.persistence.PersistentDataContainer pdc =
+                mock(org.bukkit.persistence.PersistentDataContainer.class);
+        org.bukkit.inventory.Inventory contents = TestInventories.inventory(27);
+
+        java.util.Map<org.bukkit.NamespacedKey, String> store = new java.util.HashMap<>();
+
+        when(box.getSnapshotInventory()).thenReturn(contents);
+        when(contents.getContents()).thenReturn(new ItemStack[27]);
+        when(meta.getBlockState()).thenReturn(box);
+        when(meta.getPersistentDataContainer()).thenReturn(pdc);
+        when(meta.hasDisplayName()).thenReturn(false);
+        org.mockito.Mockito.doAnswer(invocation -> {
+            store.put(invocation.getArgument(0), invocation.getArgument(2));
+            return null;
+        }).when(pdc).set(org.mockito.ArgumentMatchers.any(org.bukkit.NamespacedKey.class),
+                org.mockito.ArgumentMatchers.eq(org.bukkit.persistence.PersistentDataType.STRING),
+                org.mockito.ArgumentMatchers.any(String.class));
+
+        ItemStack shulker = mock(ItemStack.class);
+        when(shulker.getType()).thenReturn(Material.WHITE_SHULKER_BOX);
+        when(shulker.clone()).thenAnswer(answer -> shulker);
+        when(shulker.getItemMeta()).thenReturn(meta);
+
+        NeyShulker plugin = pluginWithEvents();
+
+        try (MockedStatic<Bukkit> bukkit = mockStatic(Bukkit.class)) {
+
+            bukkit.when(() -> Bukkit.createInventory(any(), anyInt(), anyString()))
+                    .thenReturn(gui);
+
+            assertTrue(openService(plugin).open(player, shulker, 5));
+
+        }
+
+        // В слот записан предмет с меткой, и метка совпадает с id сессии
+        ShulkerSession session = sessionRegistry.getSession(player);
+        assertNotNull(session);
+        assertEquals(session.sessionId().toString(),
+                store.get(org.bukkit.NamespacedKey.fromString("neyshulker:session")));
+        verify(playerInventory).setItem(eq(5), any(ItemStack.class));
 
     }
 

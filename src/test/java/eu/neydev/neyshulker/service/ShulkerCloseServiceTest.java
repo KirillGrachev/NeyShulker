@@ -14,6 +14,7 @@ import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -72,6 +73,12 @@ class ShulkerCloseServiceTest {
         ShulkerCloseService closeService = new ShulkerCloseService(
                 plugin(), sessionRegistry, persistenceService, soundService);
 
+        // Финальный предмет для события закрытия
+        ItemStack saved = mock(ItemStack.class);
+        when(saved.clone()).thenReturn(saved);
+        when(persistenceService.finalizeSession(org.mockito.ArgumentMatchers.any()))
+                .thenReturn(saved);
+
         assertTrue(closeService.close(player));
         assertFalse(closeService.close(player), "Повторное закрытие ничего не делает");
 
@@ -112,6 +119,68 @@ class ShulkerCloseServiceTest {
         assertTrue(sessionRegistry.isEmpty());
         verify(persistenceService, times(2)).persist(org.mockito.ArgumentMatchers.any(),
                 org.mockito.ArgumentMatchers.eq(false));
+
+    }
+
+
+    @Test
+    @DisplayName("close(null) и close(player, null) безопасны")
+    void nullArgumentsAreSafe() {
+
+        ShulkerCloseService closeService = new ShulkerCloseService(
+                plugin(), sessionRegistry, persistenceService, soundService);
+
+        assertFalse(closeService.close(null));
+        assertFalse(closeService.close(player, null));
+
+    }
+
+    @Test
+    @DisplayName("Чужая сессия не закрывается")
+    void foreignSessionIsNotClosed() {
+
+        ShulkerSession live = openSession();
+
+        ItemStack otherShulker = mock(ItemStack.class);
+        when(otherShulker.clone()).thenReturn(otherShulker);
+
+        Player stranger = player();
+        ShulkerSession foreign = sessionRegistry.createSession(stranger, otherShulker, 0,
+                () -> TestInventories.inventory(27));
+
+        ShulkerCloseService closeService = new ShulkerCloseService(
+                plugin(), sessionRegistry, persistenceService, soundService);
+
+        assertFalse(closeService.close(player, foreign),
+                "Сессия другого игрока нашим player-ом не закрывается");
+        assertTrue(sessionRegistry.getSession(player) == live);
+
+    }
+
+    @Test
+    @DisplayName("closeAll с оффлайн-игроком сохраняет принудительно")
+    void closeAllPersistsForOfflineOwner() {
+
+        ShulkerSession session = openSession();
+
+        when(player.isOnline()).thenReturn(false);
+
+        ShulkerCloseService closeService = new ShulkerCloseService(
+                plugin(), sessionRegistry, persistenceService, soundService);
+
+        try (org.mockito.MockedStatic<org.bukkit.Bukkit> bukkit =
+                     org.mockito.Mockito.mockStatic(org.bukkit.Bukkit.class)) {
+
+            // getPlayer не отдает игрока: принудительная ветка closeAll
+            bukkit.when(() -> org.bukkit.Bukkit.getPlayer(player.getUniqueId())).thenReturn(null);
+
+            closeService.closeAll();
+
+        }
+
+        assertTrue(sessionRegistry.isEmpty());
+        verify(persistenceService).persist(session, false);
+        verify(player, never()).closeInventory();
 
     }
 

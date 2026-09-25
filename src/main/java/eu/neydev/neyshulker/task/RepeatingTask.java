@@ -8,19 +8,21 @@ import org.jetbrains.annotations.NotNull;
 /**
  * Обертка над повторяющейся задачей Bukkit.
  * Управляет жизненным циклом: старт, остановка, безопасный рестарт после reload.
+ *
+ * Поток: start/stop допускаются из любого потока (поле задачи volatile,
+ * отмена BukkitTask потокобезопасна), но сама задача планировщика всегда
+ * выполняется в главном потоке.
  */
 public class RepeatingTask {
 
     private final Plugin plugin;
-    private final String name;
     private final Runnable action;
 
-    private BukkitTask task;
+    private volatile BukkitTask task;
 
-    public RepeatingTask(@NotNull Plugin plugin, @NotNull String name, @NotNull Runnable action) {
+    public RepeatingTask(@NotNull Plugin plugin, @NotNull Runnable action) {
 
         this.plugin = plugin;
-        this.name = name;
         this.action = action;
 
     }
@@ -40,7 +42,8 @@ public class RepeatingTask {
             return;
         }
 
-        task = Bukkit.getScheduler().runTaskTimer(plugin, action, Math.max(1L, delay), Math.max(1L, period));
+        task = Bukkit.getScheduler().runTaskTimer(plugin, action,
+                Math.max(1L, delay), Math.max(1L, period));
 
     }
 
@@ -48,18 +51,25 @@ public class RepeatingTask {
      * Останавливает задачу, если она запущена.
      */
     public void stop() {
-        if (task != null) {
-            task.cancel();
-            task = null;
+
+        BukkitTask current = task;
+        task = null;
+
+        if (current != null) {
+            current.cancel();
         }
+
     }
 
+    /**
+     * Запущена ли задача прямо сейчас: после отмены планировщиком
+     * (например, при выключении сервера) флаг честно сбрасывается.
+     */
     public boolean isRunning() {
-        return task != null;
-    }
 
-    public @NotNull String getName() {
-        return name;
+        BukkitTask current = task;
+        return current != null && !current.isCancelled();
+
     }
 
 }

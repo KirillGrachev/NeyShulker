@@ -2,27 +2,26 @@ package eu.neydev.neyshulker.service.collect;
 
 import eu.neydev.neyshulker.model.ShulkerSession;
 import eu.neydev.neyshulker.service.InventoryTransferService;
-import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
 import org.jetbrains.annotations.NotNull;
 
 /**
  * Цель - открытый GUI шалкер-бокса: вставки идут прямо в живой инвентарь
  * сессии, сохранение отмечается один раз при сбросе скана.
+ *
+ * Клиентский resync на каждую вставку здесь сознательно не делается:
+ * {@link CollectScan#flush()} синхронизирует окно один раз на волну.
  */
 public final class SessionCollectTarget implements CollectTarget {
 
-    private final Player player;
     private final ShulkerSession session;
     private final InventoryTransferService transferService;
 
     private boolean used;
 
-    public SessionCollectTarget(@NotNull Player player,
-                                @NotNull ShulkerSession session,
+    public SessionCollectTarget(@NotNull ShulkerSession session,
                                 @NotNull InventoryTransferService transferService) {
 
-        this.player = player;
         this.session = session;
         this.transferService = transferService;
 
@@ -36,7 +35,7 @@ public final class SessionCollectTarget implements CollectTarget {
     @Override
     public int insert(@NotNull ItemStack item) {
 
-        int inserted = transferService.insert(player, session.inventory(), item);
+        int inserted = transferService.insert(null, session.inventory(), item);
 
         if (inserted > 0) {
             used = true;

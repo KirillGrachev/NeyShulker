@@ -59,6 +59,27 @@ public class FakeItemStack extends ItemStack {
         return new FakeItemStack(material, amount, maxStackSize);
     }
 
+    /**
+     * Мета у фейка отсутствует: ItemMeta требует серверного ItemFactory.
+     * Проверки меток сессии (SessionTagger) трактуют такой предмет как
+     * немеченый и откатываются в legacy-ветки, а ItemStack.equals/hashCode
+     * в тестах не используются.
+     */
+    @Override
+    public org.bukkit.inventory.meta.@Nullable ItemMeta getItemMeta() {
+        return null;
+    }
+
+    @Override
+    public boolean hasItemMeta() {
+        return false;
+    }
+
+    @Override
+    public boolean setItemMeta(org.bukkit.inventory.meta.@Nullable ItemMeta itemMeta) {
+        return false;
+    }
+
     @Override
     public String toString() {
         return material.name() + " x" + amount + "/" + maxStackSize;

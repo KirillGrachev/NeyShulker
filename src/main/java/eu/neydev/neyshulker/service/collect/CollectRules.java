@@ -1,6 +1,6 @@
 package eu.neydev.neyshulker.service.collect;
 
-import eu.neydev.neyshulker.config.ConfigManager;
+import eu.neydev.neyshulker.config.NeyShulkerConfig;
 import eu.neydev.neyshulker.config.type.PermissionNode;
 import eu.neydev.neyshulker.service.PermissionService;
 import eu.neydev.neyshulker.util.ShulkerUtil;
@@ -13,6 +13,11 @@ import org.bukkit.inventory.ItemStack;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.EnumSet;
+import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 
 /**
@@ -21,17 +26,60 @@ import java.util.UUID;
  */
 public final class CollectRules {
 
-    private final ConfigManager configManager;
+    /** Дефолт, если конфигурация не отдает режимы (старые моки/снапшоты). */
+    private static final Set<GameMode> DEFAULT_GAME_MODES =
+            Collections.unmodifiableSet(EnumSet.of(GameMode.SURVIVAL, GameMode.ADVENTURE));
+
+    private final NeyShulkerConfig config;
     private final PermissionService permissionService;
     private final PlayerDropTracker dropTracker;
 
-    public CollectRules(@NotNull ConfigManager configManager,
+    public CollectRules(@NotNull NeyShulkerConfig config,
                         @NotNull PermissionService permissionService,
                         @NotNull PlayerDropTracker dropTracker) {
 
-        this.configManager = configManager;
+        this.config = config;
         this.permissionService = permissionService;
         this.dropTracker = dropTracker;
+
+    }
+
+    /**
+     * Соседи игрока, которые могут претендовать на дроп вокруг него.
+     *
+     * Легкий аналог кэша на фазу: список строится один раз на игрока
+     * (детекция или слив), а проверка каждого предмета идет по короткому
+     * списку вместо полного перебора игроков мира на каждый дроп.
+     * Радиус - сумма дистанции сбора и радиуса уважения: предмет в пределах
+     * дистанции сбора не может быть ближе к дальнему игроку, чем этот запас.
+     */
+    public @NotNull List<Player> nearbyOthers(@NotNull Player collector) {
+
+        double radius = config.getAutoCollectRespectNearbyPlayers();
+
+        if (radius <= 0D) {
+            return List.of();
+        }
+
+        double reach = config.getAutoCollectMaxDistance() + radius;
+        double squaredReach = reach * reach;
+
+        Location at = collector.getLocation();
+        List<Player> candidates = new ArrayList<>();
+
+        for (Player other : collector.getWorld().getPlayers()) {
+
+            if (other == collector || !other.isOnline()) {
+                continue;
+            }
+
+            if (other.getLocation().distanceSquared(at) <= squaredReach) {
+                candidates.add(other);
+            }
+
+        }
+
+        return candidates;
 
     }
 
@@ -47,29 +95,37 @@ public final class CollectRules {
      * @return true, если дроп надо пропустить
      */
     public boolean isContested(@NotNull Player collector, @NotNull Item item) {
+        return isContested(collector, item, nearbyOthers(collector));
+    }
 
-        if (configManager.isAutoCollectIgnorePlayerDropped() && isPlayerThrown(item)) {
+    /**
+     * Проверяет спорность дропа по заранее построенному списку соседей.
+     *
+     * @param collector собирающий игрок
+     * @param item      дроп на земле
+     * @param others    кандидаты-соседи из {@link #nearbyOthers}
+     * @return true, если дроп надо пропустить
+     */
+    public boolean isContested(@NotNull Player collector,
+                               @NotNull Item item,
+                               @NotNull List<Player> others) {
+
+        if (config.isAutoCollectIgnorePlayerDropped() && isPlayerThrown(item)) {
             return true;
         }
 
-        double radius = configManager.getAutoCollectRespectNearbyPlayers();
+        double radius = config.getAutoCollectRespectNearbyPlayers();
 
-        if (radius <= 0D) {
+        if (radius <= 0D || others.isEmpty()) {
             return false;
         }
 
         Location at = item.getLocation();
 
-        for (Player other : collector.getWorld().getPlayers()) {
-
-            if (other == collector || !other.isOnline()) {
-                continue;
-            }
-
+        for (Player other : others) {
             if (other.getLocation().distanceSquared(at) <= radius * radius) {
                 return true;
             }
-
         }
 
         return false;
@@ -93,7 +149,7 @@ public final class CollectRules {
     /**
      * Может ли игрок участвовать в автосборе в этом состоянии.
      *
-     * @param player        игрок
+     * @param player           игрок
      * @param enabledForPlayer per-player тумблер игрока
      * @return true если сбор для игрока активен
      */
@@ -103,11 +159,11 @@ public final class CollectRules {
             return false;
         }
 
-        if (!configManager.isPluginEnabled() || !configManager.isAutoCollectEnabled()) {
+        if (!config.isPluginEnabled() || !config.isAutoCollectEnabled()) {
             return false;
         }
 
-        if (player.getGameMode() == GameMode.SPECTATOR || player.getGameMode() == GameMode.CREATIVE) {
+        if (!allowedGameModes().contains(player.getGameMode())) {
             return false;
         }
 
@@ -115,8 +171,15 @@ public final class CollectRules {
             return false;
         }
 
-        return !configManager.isAutoCollectPermissionRequired()
+        return !config.isAutoCollectPermissionRequired()
                 || permissionService.has(player, PermissionNode.AUTO_COLLECT);
+
+    }
+
+    private @NotNull Set<GameMode> allowedGameModes() {
+
+        Set<GameMode> modes = config.getAutoCollectGameModes();
+        return modes == null || modes.isEmpty() ? DEFAULT_GAME_MODES : modes;
 
     }
 
@@ -136,12 +199,12 @@ public final class CollectRules {
             return true;
         }
 
-        if (configManager.isAutoCollectBlacklisted(material)) {
+        if (config.isAutoCollectBlacklisted(material)) {
             return true;
         }
 
-        return configManager.isBlacklistEnabled()
-                && configManager.isBlacklisted(material)
+        return config.isBlacklistEnabled()
+                && config.isBlacklisted(material)
                 && !permissionService.canBypassBlacklist(player);
 
     }
@@ -154,7 +217,7 @@ public final class CollectRules {
      */
     public boolean failsInventoryGate(@NotNull Player player) {
 
-        if (!configManager.isAutoCollectOnlyWhenInventoryFull()) {
+        if (!config.isAutoCollectOnlyWhenInventoryFull()) {
             return false;
         }
 

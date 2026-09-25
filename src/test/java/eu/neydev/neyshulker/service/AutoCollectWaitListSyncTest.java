@@ -8,6 +8,9 @@ import eu.neydev.neyshulker.service.collect.PlayerDropTracker;
 import eu.neydev.neyshulker.util.FakeItemStack;
 import eu.neydev.neyshulker.util.ShulkerUtil;
 import eu.neydev.neyshulker.util.TestInventories;
+import eu.neydev.neyshulker.service.collect.CollectRules;
+import eu.neydev.neyshulker.service.collect.NearbyItemsFinder;
+import static org.mockito.ArgumentMatchers.anyDouble;
 import org.bukkit.Bukkit;
 import org.bukkit.GameMode;
 import org.bukkit.Location;
@@ -75,7 +78,8 @@ class AutoCollectWaitListSyncTest {
         Location playerLocation = mock(Location.class);
         World world = mock(World.class);
 
-        when(world.getEntitiesByClass(Item.class)).thenReturn(List.of(drops));
+        when(world.getNearbyEntities(any(Location.class), anyDouble(), anyDouble(), anyDouble(), any()))
+                .thenReturn(List.of(drops));
         when(player.getWorld()).thenReturn(world);
         when(player.getLocation()).thenReturn(playerLocation);
         when(player.isOnline()).thenReturn(true);
@@ -175,7 +179,9 @@ class AutoCollectWaitListSyncTest {
 
         return new AutoCollectService(plugin, configManager, sessionRegistry,
                 new InventoryTransferService(), persistenceService,
-                messageService, soundService, permissionService, dropTracker);
+                messageService, soundService,
+                new CollectRules(configManager, permissionService, dropTracker),
+                new NearbyItemsFinder(configManager), dropTracker);
 
     }
 

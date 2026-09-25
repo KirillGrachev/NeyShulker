@@ -1,7 +1,7 @@
 package eu.neydev.neyshulker.service;
 
 import eu.neydev.neyshulker.NeyShulker;
-import eu.neydev.neyshulker.config.ConfigManager;
+import eu.neydev.neyshulker.config.NeyShulkerConfig;
 import eu.neydev.neyshulker.config.type.MessageKey;
 import eu.neydev.neyshulker.event.ShulkerAutoCollectEvent;
 import eu.neydev.neyshulker.model.ShulkerSession;
@@ -44,12 +44,16 @@ import java.util.concurrent.ConcurrentHashMap;
  * Механика вынесена в пакет service.collect: CollectRules (политики допуска),
  * NearbyItemsFinder (поиск дропов), CollectScan (рабочее содержимое боксов
  * и цели), CollectTarget (приемники), CollectEntry и PlayerWaitList
- * (лист ожидания). Сам оркестратор остается тонким.
+ * (лист ожидания). Сам оркестратор остается тонким: политики и поиск
+ * внедряются контейнером, задача планировщика создается лениво в start().
  */
 public class AutoCollectService {
 
+    /** Задержка первого запуска волны: серверу нужен хотя бы секундный прогрев. */
+    private static final long START_DELAY_TICKS = 20L;
+
     private final NeyShulker plugin;
-    private final ConfigManager configManager;
+    private final NeyShulkerConfig config;
     private final SessionRegistry sessionRegistry;
     private final InventoryTransferService transferService;
     private final ShulkerPersistenceService persistenceService;
@@ -59,38 +63,37 @@ public class AutoCollectService {
     private final CollectRules rules;
     private final PlayerDropTracker dropTracker;
     private final NearbyItemsFinder nearbyItemsFinder;
-    private final RepeatingTask collectTask;
 
     private final Set<UUID> disabledPlayers = ConcurrentHashMap.newKeySet();
     private final Map<UUID, PlayerWaitList> waitLists = new ConcurrentHashMap<>();
     private final Map<UUID, Long> fullNotices = new ConcurrentHashMap<>();
 
+    /** Создается лениво в start(): конструктор не публикует this в планировщик. */
+    private RepeatingTask collectTask;
+
     private int rotationIndex;
 
     public AutoCollectService(@NotNull NeyShulker plugin,
-                              @NotNull ConfigManager configManager,
+                              @NotNull NeyShulkerConfig config,
                               @NotNull SessionRegistry sessionRegistry,
                               @NotNull InventoryTransferService transferService,
                               @NotNull ShulkerPersistenceService persistenceService,
                               @NotNull MessageService messageService,
                               @NotNull SoundService soundService,
-                              @NotNull PermissionService permissionService,
+                              @NotNull CollectRules rules,
+                              @NotNull NearbyItemsFinder nearbyItemsFinder,
                               @NotNull PlayerDropTracker dropTracker) {
 
         this.plugin = plugin;
-        this.configManager = configManager;
+        this.config = config;
         this.sessionRegistry = sessionRegistry;
         this.transferService = transferService;
         this.persistenceService = persistenceService;
         this.messageService = messageService;
         this.soundService = soundService;
+        this.rules = rules;
+        this.nearbyItemsFinder = nearbyItemsFinder;
         this.dropTracker = dropTracker;
-
-        this.rules = new CollectRules(configManager, permissionService, dropTracker);
-        this.nearbyItemsFinder = new NearbyItemsFinder(configManager);
-        this.collectTask = new RepeatingTask(plugin, "auto-collect", this::wave);
-
-        configManager.onReload(this::restart);
 
     }
 
@@ -99,16 +102,20 @@ public class AutoCollectService {
      */
     public void start() {
 
-        if (!configManager.isPluginEnabled() || !configManager.isAutoCollectEnabled()) {
+        if (!config.isPluginEnabled() || !config.isAutoCollectEnabled()) {
             plugin.getLogger().info("Auto-collect is disabled in the configuration.");
             return;
         }
 
-        collectTask.start(20L, configManager.getWavePeriod());
+        if (collectTask == null) {
+            collectTask = new RepeatingTask(plugin, this::wave);
+        }
+
+        collectTask.start(START_DELAY_TICKS, config.getWavePeriod());
 
         plugin.getLogger().info("Auto-collect started (waves every "
-                + configManager.getWavePeriod() + " ticks, "
-                + configManager.getPlayersPerWave() + " players per wave).");
+                + config.getWavePeriod() + " ticks, "
+                + config.getPlayersPerWave() + " players per wave).");
 
     }
 
@@ -117,7 +124,10 @@ public class AutoCollectService {
      */
     public void stop() {
 
-        collectTask.stop();
+        if (collectTask != null) {
+            collectTask.stop();
+        }
+
         waitLists.clear();
         fullNotices.clear();
         dropTracker.clear();
@@ -126,6 +136,7 @@ public class AutoCollectService {
 
     /**
      * Перезапускает задачу после изменения конфигурации.
+     * Подписку на reload конфигурации выполняет ServiceContainer.
      */
     public void restart() {
 
@@ -167,7 +178,7 @@ public class AutoCollectService {
     }
 
     public boolean isRunning() {
-        return collectTask.isRunning();
+        return collectTask != null && collectTask.isRunning();
     }
 
     /**
@@ -201,7 +212,7 @@ public class AutoCollectService {
         }
 
         int total = online.size();
-        int count = Math.min(configManager.getPlayersPerWave(), total);
+        int count = Math.min(config.getPlayersPerWave(), total);
 
         for (int i = 0; i < count; i++) {
             detectPlayer(online.get((rotationIndex + i) % total));
@@ -216,12 +227,17 @@ public class AutoCollectService {
      *
      * Легкая фаза: без построения приемников, без вставок и без записи меты,
      * только ворота допуска, поиск дропов в радиусе и типы в инвентаре.
+     * Список соседей для антигриф-проверки строится один раз на игрока.
      *
      * @param player игрок
      */
     private void detectPlayer(@Nullable Player player) {
 
-        if (!rules.canCollectPlayer(player, player != null && isEnabledFor(player))) {
+        if (player == null) {
+            return;
+        }
+
+        if (!rules.canCollectPlayer(player, isEnabledFor(player))) {
             return;
         }
 
@@ -240,11 +256,13 @@ public class AutoCollectService {
         }
 
         PlayerWaitList waitList = waitLists.computeIfAbsent(player.getUniqueId(),
-                key -> new PlayerWaitList(configManager.getQueuePerPlayer()));
+                key -> new PlayerWaitList(config.getQueuePerPlayer()));
+
+        List<Player> neighbors = rules.nearbyOthers(player);
 
         for (Item item : nearbyItemsFinder.find(player)) {
 
-            if (rules.isContested(player, item)) {
+            if (rules.isContested(player, item, neighbors)) {
                 continue;
             }
 
@@ -274,8 +292,8 @@ public class AutoCollectService {
 
     /**
      * Дешевая проверка приемников: открытая сессия или шалкер-боксы
-     * в содержимом инвентаря (включая вторую руку). Зеркалит то, что
-     * позже построит CollectScan, но без чтения содержимого боксов.
+     * в содержимом инвентаря. getContents() игрока включает вторую руку,
+     * поэтому отдельная проверка оффхенда не нужна.
      */
     private boolean hasReceptacles(@NotNull Player player) {
 
@@ -283,13 +301,7 @@ public class AutoCollectService {
             return true;
         }
 
-        PlayerInventory inventory = player.getInventory();
-
-        if (ShulkerUtil.isShulkerBox(inventory.getItem(ShulkerUtil.OFF_HAND_SLOT))) {
-            return true;
-        }
-
-        for (ItemStack stack : inventory.getContents()) {
+        for (ItemStack stack : player.getInventory().getContents()) {
             if (ShulkerUtil.isShulkerBox(stack)) {
                 return true;
             }
@@ -304,7 +316,7 @@ public class AutoCollectService {
      */
     private void drainWave() {
 
-        int budget = configManager.getActionsPerWave();
+        int budget = config.getActionsPerWave();
 
         for (UUID playerId : List.copyOf(waitLists.keySet())) {
 
@@ -356,7 +368,7 @@ public class AutoCollectService {
         }
 
         ShulkerSession session = sessionRegistry.getSession(player);
-        CollectScan scan = new CollectScan(player, session, configManager,
+        CollectScan scan = new CollectScan(player, session, config,
                 transferService, persistenceService);
 
         if (!scan.hasTargets()) {
@@ -364,7 +376,8 @@ public class AutoCollectService {
             return 0;
         }
 
-        PlayerInventory inventory = player.getInventory();
+        List<Player> neighbors = rules.nearbyOthers(player);
+
         int collected = 0;
         boolean noSpace = false;
 
@@ -376,9 +389,16 @@ public class AutoCollectService {
                 break;
             }
 
-            DrainStep step = entry.isGround()
-                    ? drainGroundEntry(player, scan, waitList, entry)
-                    : drainInventoryEntry(player, inventory, scan, entry);
+            // Sealed-иерархия источника: компилятор гарантирует полноту веток
+            DrainStep step = switch (entry) {
+
+                case CollectEntry.Ground ground ->
+                        drainGroundEntry(player, scan, waitList, ground, neighbors);
+
+                case CollectEntry.Slot inventoryEntry ->
+                        drainInventoryEntry(player, scan, inventoryEntry);
+
+            };
 
             collected += step.moved();
             noSpace = noSpace || step.noSpace();
@@ -415,21 +435,22 @@ public class AutoCollectService {
     private DrainStep drainGroundEntry(@NotNull Player player,
                                        @NotNull CollectScan scan,
                                        @NotNull PlayerWaitList waitList,
-                                       @NotNull CollectEntry entry) {
+                                       @NotNull CollectEntry.Ground entry,
+                                       @NotNull List<Player> neighbors) {
 
         Item item = entry.item();
 
-        if (item == null || item.isDead() || !item.isValid()) {
+        if (item.isDead() || !item.isValid()) {
             return DrainStep.none();
         }
 
-        if (!configManager.isAutoCollectIgnorePickupDelay() && item.getPickupDelay() > 0) {
+        if (!config.isAutoCollectIgnorePickupDelay() && item.getPickupDelay() > 0) {
             waitList.offerFirst(entry);
             return DrainStep.delayed();
         }
 
         // Спорный дроп (брошен игроком или у него стоит другой игрок) не всасываем
-        if (rules.isContested(player, item)) {
+        if (rules.isContested(player, item, neighbors)) {
             return DrainStep.none();
         }
 
@@ -448,13 +469,14 @@ public class AutoCollectService {
             // о полном боксе. Слив продолжается: другой тип может смерджиться
             // в свой стек, поэтому обрывать его нельзя
             return scan.hasSpaceFor(stack) ? DrainStep.none() : DrainStep.full();
+
         }
 
-        if (!callCollectEvent(player, item, target)) {
+        if (!callCollectEvent(player, item, stack, ShulkerAutoCollectEvent.GROUND_SLOT, target)) {
             return DrainStep.none();
         }
 
-        int inserted = target.insert(stack.clone());
+        int inserted = target.insert(stack);
 
         if (inserted <= 0) {
             return DrainStep.full();
@@ -469,13 +491,14 @@ public class AutoCollectService {
      * Погружает один предмет из области хранения инвентаря.
      *
      * Слот между детекцией и сливом мог измениться, поэтому элемент
-     * дополнительно сверяется с текущим состоянием слота.
+     * дополнительно сверяется с текущим состоянием слота. Отмена
+     * {@link ShulkerAutoCollectEvent} оставляет предмет в слоте.
      */
     private DrainStep drainInventoryEntry(@NotNull Player player,
-                                          @NotNull PlayerInventory inventory,
                                           @NotNull CollectScan scan,
-                                          @NotNull CollectEntry entry) {
+                                          @NotNull CollectEntry.Slot entry) {
 
+        PlayerInventory inventory = player.getInventory();
         ItemStack stack = inventory.getItem(entry.slot());
 
         if (inventoryEntryStale(player, stack, entry)) {
@@ -488,7 +511,11 @@ public class AutoCollectService {
             return DrainStep.none();
         }
 
-        int moved = target.insert(stack.clone());
+        if (!callCollectEvent(player, null, stack, entry.slot(), target)) {
+            return DrainStep.none();
+        }
+
+        int moved = target.insert(stack);
 
         if (moved <= 0) {
             return DrainStep.none();
@@ -519,9 +546,11 @@ public class AutoCollectService {
     private boolean inventoryEntryStale(@NotNull Player player,
                                         @Nullable ItemStack stack,
                                         @NotNull CollectEntry entry) {
+
         return ShulkerUtil.isEmpty(stack)
                 || stack.getType() != entry.material()
                 || rules.isExcluded(player, stack);
+
     }
 
     /**
@@ -545,8 +574,8 @@ public class AutoCollectService {
 
         PlayerInventory inventory = player.getInventory();
 
-        waitList.removeIf(entry -> !entry.isGround()
-                && inventoryEntryStale(player, inventory.getItem(entry.slot()), entry));
+        waitList.removeIf(entry -> entry instanceof CollectEntry.Slot slot
+                && inventoryEntryStale(player, inventory.getItem(slot.slot()), slot));
 
         if (waitList.isEmpty()) {
             waitLists.remove(player.getUniqueId());
@@ -646,10 +675,13 @@ public class AutoCollectService {
     }
 
     private boolean callCollectEvent(@NotNull Player player,
-                                     @NotNull Item item,
+                                     @Nullable Item item,
+                                     @NotNull ItemStack source,
+                                     int sourceSlot,
                                      @NotNull CollectTarget target) {
 
-        ShulkerAutoCollectEvent event = new ShulkerAutoCollectEvent(player, item, target.shulkerItem());
+        ShulkerAutoCollectEvent event = new ShulkerAutoCollectEvent(
+                player, item, source, sourceSlot, target.shulkerItem());
         Bukkit.getPluginManager().callEvent(event);
         return !event.isCancelled();
 
@@ -674,7 +706,7 @@ public class AutoCollectService {
         // Кулдаун на игрока: полный бокс под массовым дропом (взрыв крипера)
         // остается одной строкой в чате, а не сообщением на каждую волну
         long now = System.currentTimeMillis();
-        long cooldownMillis = configManager.getFullMessageCooldown() * 1000L;
+        long cooldownMillis = config.getFullMessageCooldown() * 1000L;
         Long lastNotice = fullNotices.get(player.getUniqueId());
 
         if (lastNotice != null && now - lastNotice < cooldownMillis) {

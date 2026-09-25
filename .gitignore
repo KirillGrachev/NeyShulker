@@ -5,6 +5,8 @@ dependency-reduced-pom.xml
 # IDE
 .idea/
 *.iml
+# Файл модуля проекта ведется в репозитории сознательно (Minecraft-facet для IDEA)
+!NeyShulker.iml
 .vscode/
 .settings/
 .classpath
@@ -17,3 +19,6 @@ Thumbs.db
 # Local artifacts
 *.zip
 *.jar
+
+# Local smoke-test leftovers
+server.pid

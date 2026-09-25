@@ -1,6 +1,6 @@
 package eu.neydev.neyshulker.listener;
 
-import eu.neydev.neyshulker.NeyShulker;
+import eu.neydev.neyshulker.service.collect.PlayerDropTracker;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
@@ -15,10 +15,10 @@ import org.jetbrains.annotations.NotNull;
  */
 public final class PlayerDropListener implements Listener {
 
-    private final NeyShulker plugin;
+    private final PlayerDropTracker dropTracker;
 
-    public PlayerDropListener(@NotNull NeyShulker plugin) {
-        this.plugin = plugin;
+    public PlayerDropListener(@NotNull PlayerDropTracker dropTracker) {
+        this.dropTracker = dropTracker;
     }
 
     /**
@@ -28,7 +28,7 @@ public final class PlayerDropListener implements Listener {
      */
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
     public void onDropItem(@NotNull PlayerDropItemEvent event) {
-        plugin.getServices().getDropTracker().mark(event.getItemDrop());
+        dropTracker.mark(event.getItemDrop());
     }
 
 }

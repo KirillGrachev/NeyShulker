@@ -12,31 +12,44 @@ import eu.neydev.neyshulker.config.type.FillOrderType;
 import eu.neydev.neyshulker.config.type.TitleMode;
 import eu.neydev.neyshulker.service.ConsoleService;
 import eu.neydev.neyshulker.util.HexColorUtil;
+import org.bukkit.GameMode;
 import org.bukkit.Material;
+import org.bukkit.configuration.ConfigurationSection;
+import org.bukkit.configuration.InvalidConfigurationException;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.configuration.file.YamlConfiguration;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.io.File;
+import java.io.IOException;
 import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.Locale;
 import java.util.Collections;
 import java.util.EnumMap;
 import java.util.EnumSet;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.logging.Level;
 
 /**
  * Менеджер конфигурации NeyShulker.
  *
- * Все значения читаются один раз при загрузке и кэшируются, обращения
- * из слушателей не трогают диск и YAML. Некорректные значения не роняют
- * загрузку: подставляется дефолт, а в консоль уходит шаблонное
- * предупреждение через ConsoleService.
+ * Все значения читаются один раз при загрузке и собираются в неизменяемый
+ * снапшот {@link ConfigSnapshot}, который подменяется одной volatile-записью.
+ * Читатели (главный поток и async-поток PlaceholderAPI) всегда видят
+ * согласованный набор значений: ни составных гонок «флаг новый, список
+ * старый», ни проблем видимости. Обращения из слушателей не трогают диск
+ * и YAML. Некорректные значения не роняют загрузку: подставляется дефолт,
+ * а в консоль уходит шаблонное предупреждение через ConsoleService.
+ *
+ * Источник истины один - {@code plugin.getConfig()}: отдельного парсинга
+ * файла менеджер не ведет, reload использует штатный reloadConfig().
+ * Поврежденный YAML не тонет в тишине: файл перечитывается явно и ошибка
+ * уходит в SEVERE-лог со стектрейсом.
  */
 public class ConfigManager implements NeyShulkerConfig {
 
@@ -44,7 +57,6 @@ public class ConfigManager implements NeyShulkerConfig {
     private final ConsoleService consoleService;
     private final List<Runnable> reloadListeners = new CopyOnWriteArrayList<>();
 
-    private FileConfiguration config;
     private static final String PATH_ENABLED = "settings.enabled";
 
     private static final String PATH_OPEN_METHOD = "settings.shulker.open_method";
@@ -72,6 +84,7 @@ public class ConfigManager implements NeyShulkerConfig {
     private static final String PATH_RESPECT_NEARBY_PLAYERS = "settings.auto_collect.rules.respect_nearby_players";
     private static final String PATH_AUTO_COLLECT_PERMISSION = "settings.auto_collect.permission.required";
     private static final String PATH_AUTO_COLLECT_FILL_ORDER = "settings.auto_collect.rules.fill_order";
+    private static final String PATH_AUTO_COLLECT_GAME_MODES = "settings.auto_collect.rules.gamemodes";
     private static final String PATH_AUTO_COLLECT_PRIORITY = "settings.auto_collect.priority_items";
     private static final String PATH_AUTO_COLLECT_IGNORED = "settings.auto_collect.ignored_items";
     private static final String PATH_LEGACY_AUTO_COLLECT_BLACKLIST = "settings.auto_collect.blacklist";
@@ -81,7 +94,10 @@ public class ConfigManager implements NeyShulkerConfig {
     private static final String PATH_PERMISSIONS_ENABLED = "permissions.enabled";
     private static final String PATH_PERMISSION_OP_BYPASS = "permissions.op_bypass";
 
+    /** Минимальный интервал в тиках (период волны, save_interval). */
     private static final int MIN_INTERVAL_TICKS = 1;
+    /** Минимальное количество (игроков/действий на волну, размер очереди). */
+    private static final int MIN_COUNT = 1;
     private static final int MIN_COOLDOWN_SECONDS = 0;
     private static final double MIN_DISTANCE = 0.0D;
 
@@ -102,53 +118,98 @@ public class ConfigManager implements NeyShulkerConfig {
             Material.DIAMOND, Material.EMERALD, Material.GOLD_INGOT, Material.IRON_INGOT
     );
 
-    private boolean pluginEnabled;
+    /** Режимы, в которых автосбор работает по умолчанию. */
+    private static final Set<GameMode> DEFAULT_GAME_MODES =
+            Collections.unmodifiableSet(EnumSet.of(GameMode.SURVIVAL, GameMode.ADVENTURE));
 
-    private OpenMethodType openMethod;
-    private TitleMode titleMode;
-    private String titleFormat;
-    private Map<String, String> titleNames;
-    private int saveInterval;
-    private boolean blacklistEnabled;
-    private Set<Material> blacklistedMaterials;
+    /**
+     * Английские дефолты сообщений, окрашенные один раз: fallback
+     * {@link #getMessages} не пересобирает строки на каждый вызов.
+     */
+    private static final Map<MessageKey, List<String>> DEFAULT_MESSAGES;
 
-    private boolean autoCollectEnabled;
-    private boolean autoCollectPermissionRequired;
-    private double autoCollectMaxDistance;
-    private int wavePeriod;
-    private int wavePlayers;
-    private int waveActions;
-    private int waveQueue;
-    private int fullMessageCooldown;
-    private boolean autoCollectOnlyWhenInventoryFull;
-    private boolean autoCollectMergeIntoExisting;
-    private CollectMode autoCollectMode;
-    private boolean autoCollectIgnorePickupDelay;
-    private boolean autoCollectIgnorePlayerDropped;
-    private double autoCollectRespectNearbyPlayers;
-    private FillOrderType autoCollectFillOrder;
-    private List<Material> autoCollectPriorityItems;
-    private Set<Material> autoCollectBlacklist;
+    static {
 
-    private boolean messagesEnabled;
-    private String messagePrefix;
-    private final Map<MessageKey, List<String>> messages = new EnumMap<>(MessageKey.class);
+        Map<MessageKey, List<String>> defaults = new EnumMap<>(MessageKey.class);
 
-    private final Map<SoundKey, SoundSettings> sounds = new EnumMap<>(SoundKey.class);
+        for (MessageKey key : MessageKey.values()) {
+            defaults.put(key, List.of(HexColorUtil.color(key.getDefaultMessage()).split("\n")));
+        }
 
-    private boolean permissionsEnabled;
-    private boolean permissionOpBypass;
-    private final Map<PermissionNode, String> permissions = new EnumMap<>(PermissionNode.class);
+        DEFAULT_MESSAGES = Collections.unmodifiableMap(defaults);
+
+    }
+
+    // ------------------------------------------------------------------
+    // Снапшот: все значения конфигурации одним неизменяемым объектом
+    // ------------------------------------------------------------------
+
+    private record ShulkerSection(OpenMethodType openMethod,
+                                  TitleMode titleMode,
+                                  String titleFormat,
+                                  Map<String, String> titleNames,
+                                  int saveInterval,
+                                  boolean blacklistEnabled,
+                                  Set<Material> blacklistedMaterials) {
+    }
+
+    private record AutoCollectSection(boolean enabled,
+                                      boolean permissionRequired,
+                                      double maxDistance,
+                                      int wavePeriod,
+                                      int wavePlayers,
+                                      int waveActions,
+                                      int waveQueue,
+                                      int fullMessageCooldown,
+                                      boolean onlyWhenInventoryFull,
+                                      boolean mergeIntoExisting,
+                                      CollectMode mode,
+                                      boolean ignorePickupDelay,
+                                      boolean ignorePlayerDropped,
+                                      double respectNearbyPlayers,
+                                      FillOrderType fillOrder,
+                                      List<Material> priorityItems,
+                                      Set<Material> blacklist,
+                                      Set<GameMode> gameModes) {
+    }
+
+    private record MessagingSection(boolean enabled,
+                                    String prefix,
+                                    Map<MessageKey, List<String>> messages) {
+    }
+
+    private record PermissionsSection(boolean enabled,
+                                      boolean opBypass,
+                                      Map<PermissionNode, String> permissions) {
+    }
+
+    private record ConfigSnapshot(boolean pluginEnabled,
+                                  ShulkerSection shulker,
+                                  AutoCollectSection autoCollect,
+                                  MessagingSection messaging,
+                                  Map<SoundKey, SoundSettings> sounds,
+                                  PermissionsSection permissions) {
+    }
+
+    /**
+     * Текущий снапшот. Единственное изменяемое поле менеджера; подменяется
+     * атомарно, поэтому составные значения никогда не читаются «наполовину».
+     */
+    private volatile ConfigSnapshot snapshot;
+
+    private FileConfiguration config;
 
     public ConfigManager(NeyShulker plugin, ConsoleService consoleService) {
 
         this.plugin = plugin;
         this.consoleService = consoleService;
 
-        saveDefaultConfig();
+        plugin.saveDefaultConfig();
 
-        loadConfig();
-        cacheConfigValues();
+        this.config = plugin.getConfig();
+
+        validateReadable();
+        this.snapshot = buildSnapshot();
 
     }
 
@@ -159,8 +220,12 @@ public class ConfigManager implements NeyShulkerConfig {
 
         plugin.reloadConfig();
 
-        loadConfig();
-        cacheConfigValues();
+        this.config = plugin.getConfig();
+
+        validateReadable();
+
+        ConfigSnapshot rebuilt = buildSnapshot();
+        this.snapshot = rebuilt;
 
         reloadListeners.forEach(Runnable::run);
 
@@ -175,266 +240,298 @@ public class ConfigManager implements NeyShulkerConfig {
         reloadListeners.add(listener);
     }
 
+    // ------------------------------------------------------------------
+    // Геттеры контракта: делегируют в текущий снапшот
+    // ------------------------------------------------------------------
+
     @Override
     public boolean isPluginEnabled() {
-        return pluginEnabled;
+        return snapshot.pluginEnabled();
     }
 
     @Override
     public OpenMethodType getOpenMethod() {
-        return openMethod;
+        return snapshot.shulker().openMethod();
     }
 
     @Override
     public TitleMode getTitleMode() {
-        return titleMode;
+        return snapshot.shulker().titleMode();
     }
 
     @Override
     public String getTitleFormat() {
-        return titleFormat;
+        return snapshot.shulker().titleFormat();
     }
 
     @Override
     public int getSaveInterval() {
-        return saveInterval;
+        return snapshot.shulker().saveInterval();
     }
 
     @Override
     public boolean isBlacklistEnabled() {
-        return blacklistEnabled;
+        return snapshot.shulker().blacklistEnabled();
     }
 
     @Override
     public Set<Material> getBlacklistedMaterials() {
-        return blacklistedMaterials;
+        return snapshot.shulker().blacklistedMaterials();
     }
 
     @Override
     public boolean isBlacklisted(Material material) {
-        return blacklistEnabled && material != null && blacklistedMaterials.contains(material);
+
+        ShulkerSection shulker = snapshot.shulker();
+        return shulker.blacklistEnabled() && material != null
+                && shulker.blacklistedMaterials().contains(material);
+
     }
 
     @Override
     public boolean isAutoCollectEnabled() {
-        return autoCollectEnabled;
+        return snapshot.autoCollect().enabled();
     }
 
     @Override
     public boolean isAutoCollectPermissionRequired() {
-        return autoCollectPermissionRequired;
+        return snapshot.autoCollect().permissionRequired();
     }
 
     @Override
     public double getAutoCollectMaxDistance() {
-        return autoCollectMaxDistance;
+        return snapshot.autoCollect().maxDistance();
     }
 
     @Override
     public int getWavePeriod() {
-        return wavePeriod;
+        return snapshot.autoCollect().wavePeriod();
     }
 
     @Override
     public int getPlayersPerWave() {
-        return wavePlayers;
+        return snapshot.autoCollect().wavePlayers();
     }
 
     @Override
     public int getActionsPerWave() {
-        return waveActions;
+        return snapshot.autoCollect().waveActions();
     }
 
     @Override
     public int getQueuePerPlayer() {
-        return waveQueue;
+        return snapshot.autoCollect().waveQueue();
     }
 
     @Override
     public int getFullMessageCooldown() {
-        return fullMessageCooldown;
+        return snapshot.autoCollect().fullMessageCooldown();
     }
 
     @Override
     public boolean isAutoCollectOnlyWhenInventoryFull() {
-        return autoCollectOnlyWhenInventoryFull;
+        return snapshot.autoCollect().onlyWhenInventoryFull();
     }
 
     @Override
     public boolean isAutoCollectMergeIntoExisting() {
-        return autoCollectMergeIntoExisting;
+        return snapshot.autoCollect().mergeIntoExisting();
     }
 
     @Override
     public CollectMode getAutoCollectMode() {
-        return autoCollectMode;
+        return snapshot.autoCollect().mode();
     }
 
     @Override
     public boolean isAutoCollectIgnorePickupDelay() {
-        return autoCollectIgnorePickupDelay;
+        return snapshot.autoCollect().ignorePickupDelay();
     }
 
     @Override
     public boolean isAutoCollectIgnorePlayerDropped() {
-        return autoCollectIgnorePlayerDropped;
+        return snapshot.autoCollect().ignorePlayerDropped();
     }
 
     @Override
     public double getAutoCollectRespectNearbyPlayers() {
-        return autoCollectRespectNearbyPlayers;
+        return snapshot.autoCollect().respectNearbyPlayers();
     }
 
     @Override
     public FillOrderType getAutoCollectFillOrder() {
-        return autoCollectFillOrder;
+        return snapshot.autoCollect().fillOrder();
     }
 
     @Override
     public Map<String, String> getTitleNames() {
-        return titleNames;
+        return snapshot.shulker().titleNames();
     }
 
     @Override
     public List<Material> getAutoCollectPriorityItems() {
-        return autoCollectPriorityItems;
+        return snapshot.autoCollect().priorityItems();
     }
 
     @Override
     public Set<Material> getAutoCollectBlacklist() {
-        return autoCollectBlacklist;
+        return snapshot.autoCollect().blacklist();
     }
 
     @Override
     public boolean isAutoCollectBlacklisted(Material material) {
-        return material != null && autoCollectBlacklist.contains(material);
+        return material != null && snapshot.autoCollect().blacklist().contains(material);
+    }
+
+    @Override
+    public Set<GameMode> getAutoCollectGameModes() {
+        return snapshot.autoCollect().gameModes();
     }
 
     @Override
     public boolean areMessagesEnabled() {
-        return messagesEnabled;
+        return snapshot.messaging().enabled();
     }
 
     @Override
     public String getMessagePrefix() {
-        return messagePrefix;
+        return snapshot.messaging().prefix();
     }
 
     @Override
     public List<String> getMessages(MessageKey key) {
-
-        List<String> cached = messages.get(key);
-
-        if (cached != null) {
-            return cached;
-        }
-
-        // Дефолт ключа может содержать переносы: каждое полотно режется на строки
-        return List.of(HexColorUtil.color(key.getDefaultMessage()).split("\n"));
-
+        return snapshot.messaging().messages()
+                .getOrDefault(key, DEFAULT_MESSAGES.getOrDefault(key, List.of()));
     }
 
     @Override
     public SoundSettings getOpenSound() {
-        return sounds.get(SoundKey.OPEN);
+        return snapshot.sounds().get(SoundKey.OPEN);
     }
 
     @Override
     public SoundSettings getCloseSound() {
-        return sounds.get(SoundKey.CLOSE);
+        return snapshot.sounds().get(SoundKey.CLOSE);
     }
 
     @Override
     public SoundSettings getCollectSound() {
-        return sounds.get(SoundKey.COLLECT);
+        return snapshot.sounds().get(SoundKey.COLLECT);
     }
 
     @Override
     public boolean arePermissionsEnabled() {
-        return permissionsEnabled;
+        return snapshot.permissions().enabled();
     }
 
     @Override
     public boolean isPermissionOpBypass() {
-        return permissionOpBypass;
+        return snapshot.permissions().opBypass();
     }
 
     @Override
     public String getPermission(PermissionNode node) {
-        return permissions.getOrDefault(node, node.getDefaultPermission());
+        return snapshot.permissions().permissions()
+                .getOrDefault(node, node.getDefaultPermission());
     }
 
-    private void saveDefaultConfig() {
-        plugin.saveDefaultConfig();
-    }
+    // ------------------------------------------------------------------
+    // Сборка снапшота
+    // ------------------------------------------------------------------
 
-    private void loadConfig() {
+    /**
+     * Явно перечитывает файл, если результат штатной загрузки пуст:
+     * Bukkit глотает InvalidConfigurationException и молча отдает пустую
+     * конфигурацию. Поврежденный YAML должен кричать в консоль, а не
+     * тихо работать на дефолтах.
+     */
+    private void validateReadable() {
 
         File configFile = new File(plugin.getDataFolder(), "config.yml");
-        config = YamlConfiguration.loadConfiguration(configFile);
+
+        if (!configFile.exists() || !config.getKeys(false).isEmpty()) {
+            return;
+        }
+
+        try {
+
+            new YamlConfiguration().load(configFile);
+
+        } catch (IOException | InvalidConfigurationException exception) {
+
+            plugin.getLogger().log(Level.SEVERE,
+                    "config.yml is broken and cannot be parsed - built-in defaults are used. "
+                            + "Fix the file and run /shulker reload.",
+                    exception);
+
+        }
 
     }
 
-    private void cacheConfigValues() {
+    private @NotNull ConfigSnapshot buildSnapshot() {
 
-        cacheShulkerValues();
-        cacheAutoCollectValues();
-        cacheMessages();
-        cacheSounds();
-        cachePermissions();
-
-    }
-
-    private void cacheShulkerValues() {
-
-        pluginEnabled = config.getBoolean(PATH_ENABLED, true);
-        openMethod = parseOpenMethod();
-        titleMode = parseTitleMode();
-        titleFormat = color(readTitleFormat());
-        saveInterval = intOrWarn(config.getInt(PATH_SAVE_INTERVAL, 10),
-                PATH_SAVE_INTERVAL, MIN_INTERVAL_TICKS);
-        titleNames = readTitleNames();
-        blacklistEnabled = readBoolean(PATH_BLOCKED_ITEMS_ENABLED, PATH_LEGACY_BLACKLIST_ENABLED, true);
-        blacklistedMaterials = readMaterials(PATH_BLOCKED_ITEMS, PATH_LEGACY_BLACKLIST_ITEMS, DEFAULT_BLACKLIST);
+        return new ConfigSnapshot(
+                config.getBoolean(PATH_ENABLED, true),
+                buildShulkerSection(),
+                buildAutoCollectSection(),
+                buildMessagingSection(),
+                buildSounds(),
+                buildPermissionsSection()
+        );
 
     }
 
-    private void cacheAutoCollectValues() {
+    private @NotNull ShulkerSection buildShulkerSection() {
 
-        autoCollectEnabled = config.getBoolean(PATH_AUTO_COLLECT_ENABLED, true);
-        autoCollectPermissionRequired = config.getBoolean(PATH_AUTO_COLLECT_PERMISSION, false);
-        autoCollectMaxDistance = doubleOrWarn(config.getDouble(PATH_AUTO_COLLECT_DISTANCE, 4.5D),
-                PATH_AUTO_COLLECT_DISTANCE, MIN_DISTANCE);
-        wavePeriod = intOrWarn(config.getInt(PATH_WAVE_PERIOD, 10),
-                PATH_WAVE_PERIOD, MIN_INTERVAL_TICKS);
-        wavePlayers = intOrWarn(config.getInt(PATH_WAVE_PLAYERS, 5),
-                PATH_WAVE_PLAYERS, MIN_INTERVAL_TICKS);
-        waveActions = intOrWarn(config.getInt(PATH_WAVE_ACTIONS, 16),
-                PATH_WAVE_ACTIONS, MIN_INTERVAL_TICKS);
-        waveQueue = intOrWarn(config.getInt(PATH_WAVE_QUEUE, 32),
-                PATH_WAVE_QUEUE, MIN_INTERVAL_TICKS);
-        fullMessageCooldown = intOrWarn(config.getInt(PATH_FULL_MESSAGE_COOLDOWN, 30),
-                PATH_FULL_MESSAGE_COOLDOWN, MIN_COOLDOWN_SECONDS);
-        autoCollectOnlyWhenInventoryFull = config.getBoolean(PATH_AUTO_COLLECT_ONLY_FULL, false);
-        autoCollectMergeIntoExisting = config.getBoolean(PATH_AUTO_COLLECT_MERGE, true);
-        autoCollectMode = parseCollectMode();
-        autoCollectIgnorePickupDelay = config.getBoolean(PATH_AUTO_COLLECT_IGNORE_DELAY, false);
-        autoCollectIgnorePlayerDropped = config.getBoolean(PATH_IGNORE_PLAYER_DROPPED, true);
-        autoCollectRespectNearbyPlayers = doubleOrWarn(
-                config.getDouble(PATH_RESPECT_NEARBY_PLAYERS, 4.5D),
-                PATH_RESPECT_NEARBY_PLAYERS, 0.0D);
-        autoCollectFillOrder = parseFillOrder();
-        autoCollectBlacklist = readMaterials(PATH_AUTO_COLLECT_IGNORED,
-                PATH_LEGACY_AUTO_COLLECT_BLACKLIST, DEFAULT_AUTO_COLLECT_BLACKLIST);
-        autoCollectPriorityItems = readMaterialList(PATH_AUTO_COLLECT_PRIORITY, DEFAULT_PRIORITY_ITEMS);
+        return new ShulkerSection(
+                parseOpenMethod(),
+                parseTitleMode(),
+                color(readTitleFormat()),
+                readTitleNames(),
+                intOrWarn(config.getInt(PATH_SAVE_INTERVAL, 10),
+                        PATH_SAVE_INTERVAL, MIN_INTERVAL_TICKS),
+                readBoolean(PATH_BLOCKED_ITEMS_ENABLED, PATH_LEGACY_BLACKLIST_ENABLED, true),
+                readMaterials(PATH_BLOCKED_ITEMS, PATH_LEGACY_BLACKLIST_ITEMS, DEFAULT_BLACKLIST)
+        );
 
     }
 
-    private void cacheMessages() {
+    private @NotNull AutoCollectSection buildAutoCollectSection() {
 
-        messagesEnabled = config.getBoolean(PATH_MESSAGES_ENABLED, true);
-        messagePrefix = color(config.getString(PATH_MESSAGE_PREFIX, ""));
-        messages.clear();
+        return new AutoCollectSection(
+                config.getBoolean(PATH_AUTO_COLLECT_ENABLED, true),
+                config.getBoolean(PATH_AUTO_COLLECT_PERMISSION, false),
+                doubleOrWarn(config.getDouble(PATH_AUTO_COLLECT_DISTANCE, 4.5D),
+                        PATH_AUTO_COLLECT_DISTANCE, MIN_DISTANCE),
+                intOrWarn(config.getInt(PATH_WAVE_PERIOD, 10),
+                        PATH_WAVE_PERIOD, MIN_INTERVAL_TICKS),
+                intOrWarn(config.getInt(PATH_WAVE_PLAYERS, 5),
+                        PATH_WAVE_PLAYERS, MIN_COUNT),
+                intOrWarn(config.getInt(PATH_WAVE_ACTIONS, 16),
+                        PATH_WAVE_ACTIONS, MIN_COUNT),
+                intOrWarn(config.getInt(PATH_WAVE_QUEUE, 32),
+                        PATH_WAVE_QUEUE, MIN_COUNT),
+                intOrWarn(config.getInt(PATH_FULL_MESSAGE_COOLDOWN, 30),
+                        PATH_FULL_MESSAGE_COOLDOWN, MIN_COOLDOWN_SECONDS),
+                config.getBoolean(PATH_AUTO_COLLECT_ONLY_FULL, false),
+                config.getBoolean(PATH_AUTO_COLLECT_MERGE, true),
+                parseCollectMode(),
+                config.getBoolean(PATH_AUTO_COLLECT_IGNORE_DELAY, false),
+                config.getBoolean(PATH_IGNORE_PLAYER_DROPPED, true),
+                doubleOrWarn(config.getDouble(PATH_RESPECT_NEARBY_PLAYERS, 4.5D),
+                        PATH_RESPECT_NEARBY_PLAYERS, MIN_DISTANCE),
+                parseFillOrder(),
+                readMaterialList(PATH_AUTO_COLLECT_PRIORITY, DEFAULT_PRIORITY_ITEMS),
+                readMaterials(PATH_AUTO_COLLECT_IGNORED,
+                        PATH_LEGACY_AUTO_COLLECT_BLACKLIST, DEFAULT_AUTO_COLLECT_BLACKLIST),
+                readGameModes(PATH_AUTO_COLLECT_GAME_MODES, DEFAULT_GAME_MODES)
+        );
+
+    }
+
+    private @NotNull MessagingSection buildMessagingSection() {
+
+        Map<MessageKey, List<String>> messages = new EnumMap<>(MessageKey.class);
 
         for (MessageKey key : MessageKey.values()) {
 
@@ -450,28 +547,40 @@ public class ConfigManager implements NeyShulkerConfig {
 
         }
 
+        return new MessagingSection(
+                config.getBoolean(PATH_MESSAGES_ENABLED, true),
+                color(config.getString(PATH_MESSAGE_PREFIX, "")),
+                Collections.unmodifiableMap(messages)
+        );
+
     }
 
-    private void cacheSounds() {
+    private @NotNull Map<SoundKey, SoundSettings> buildSounds() {
 
-        sounds.clear();
+        Map<SoundKey, SoundSettings> sounds = new EnumMap<>(SoundKey.class);
 
         for (SoundKey key : SoundKey.values()) {
             sounds.put(key, loadSound(key));
         }
 
+        return Collections.unmodifiableMap(sounds);
+
     }
 
-    private void cachePermissions() {
+    private @NotNull PermissionsSection buildPermissionsSection() {
 
-        permissionsEnabled = config.getBoolean(PATH_PERMISSIONS_ENABLED, false);
-        permissionOpBypass = config.getBoolean(PATH_PERMISSION_OP_BYPASS, false);
-        permissions.clear();
+        Map<PermissionNode, String> permissions = new EnumMap<>(PermissionNode.class);
 
         for (PermissionNode node : PermissionNode.values()) {
             permissions.put(node, config.getString("permissions." + node.getConfigKey(),
                     node.getDefaultPermission()));
         }
+
+        return new PermissionsSection(
+                config.getBoolean(PATH_PERMISSIONS_ENABLED, false),
+                config.getBoolean(PATH_PERMISSION_OP_BYPASS, false),
+                Collections.unmodifiableMap(permissions)
+        );
 
     }
 
@@ -521,6 +630,68 @@ public class ConfigManager implements NeyShulkerConfig {
     }
 
     /**
+     * Читает режимы игры, в которых автосбор активен.
+     * Пустой или отсутствующий список дает дефолт (SURVIVAL, ADVENTURE):
+     * случайная пустая секция не должна молча выключать сбор у всех.
+     *
+     * @return неизменяемое множество режимов
+     */
+    private @NotNull Set<GameMode> readGameModes(String path, Set<GameMode> defaults) {
+
+        List<String> names = config.getStringList(path);
+
+        if (names.isEmpty()) {
+            return defaults;
+        }
+
+        Set<GameMode> modes = EnumSet.noneOf(GameMode.class);
+
+        for (String name : names) {
+
+            GameMode mode = readGameMode(name, path);
+
+            if (mode != null) {
+                modes.add(mode);
+            }
+
+        }
+
+        if (modes.isEmpty()) {
+
+            consoleService.log(ConsoleMessage.INVALID_VALUE,
+                    "path", path,
+                    "value", String.join(", ", names),
+                    "defaultValue", "SURVIVAL, ADVENTURE");
+            return defaults;
+
+        }
+
+        return Collections.unmodifiableSet(modes);
+
+    }
+
+    private @Nullable GameMode readGameMode(@Nullable String name, @NotNull String path) {
+
+        if (name == null || name.isBlank()) {
+            return null;
+        }
+
+        String normalized = name.trim().toUpperCase(Locale.ROOT);
+
+        for (GameMode mode : GameMode.values()) {
+            if (mode.name().equals(normalized)) {
+                return mode;
+            }
+        }
+
+        consoleService.log(ConsoleMessage.UNKNOWN_GAME_MODE,
+                "path", path,
+                "value", name);
+        return null;
+
+    }
+
+    /**
      * Читает имена безымянного шалкер-бокса по языкам клиента.
      * Ключи приводятся к нижнему регистру, значения получают цвета сразу.
      *
@@ -530,7 +701,7 @@ public class ConfigManager implements NeyShulkerConfig {
 
         Object raw = config.get(PATH_TITLE_NAMES);
 
-        if (!(raw instanceof org.bukkit.configuration.ConfigurationSection section)) {
+        if (!(raw instanceof ConfigurationSection section)) {
             return Map.of();
         }
 
@@ -554,8 +725,8 @@ public class ConfigManager implements NeyShulkerConfig {
      * Читает булев флаг с legacy-путем как запасным: старые конфигурации
      * продолжают работать, а в консоль уходит предупреждение о переименовании.
      *
-     * @param path        актуальный путь
-     * @param legacyPath  устаревший путь
+     * @param path         актуальный путь
+     * @param legacyPath   устаревший путь
      * @param defaultValue значение по умолчанию
      * @return значение флага
      */
@@ -588,7 +759,7 @@ public class ConfigManager implements NeyShulkerConfig {
      */
     private @NotNull TitleMode parseTitleMode() {
 
-        String configValue = config.get(PATH_TITLE) instanceof org.bukkit.configuration.ConfigurationSection section
+        String configValue = config.get(PATH_TITLE) instanceof ConfigurationSection section
                 ? section.getString("mode", TitleMode.CUSTOM.name())
                 : TitleMode.CUSTOM.name();
 
@@ -615,7 +786,7 @@ public class ConfigManager implements NeyShulkerConfig {
 
         Object raw = config.get(PATH_TITLE);
 
-        if (raw instanceof org.bukkit.configuration.ConfigurationSection section) {
+        if (raw instanceof ConfigurationSection section) {
             return section.getString("format", "{shulker_name}");
         }
 
@@ -762,8 +933,8 @@ public class ConfigManager implements NeyShulkerConfig {
     }
 
     private @NotNull Set<Material> readMaterials(String path,
-                                                  String legacyPath,
-                                                  Set<Material> defaults) {
+                                                 String legacyPath,
+                                                 Set<Material> defaults) {
 
         List<String> names = config.getStringList(path);
         String sourcePath = path;
@@ -795,7 +966,7 @@ public class ConfigManager implements NeyShulkerConfig {
 
         }
 
-        return materials;
+        return Collections.unmodifiableSet(materials);
 
     }
 
