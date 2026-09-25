@@ -59,4 +59,5 @@ class ShulkerUtilTest {
     void shulkerSizeIsConstant() {
         assertEquals(27, ShulkerUtil.SHULKER_SIZE);
     }
+
 }

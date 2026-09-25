@@ -75,4 +75,5 @@ class NeyShulkerEventTest {
                         mock(ItemStack.class)).getHandlers());
 
     }
+
 }

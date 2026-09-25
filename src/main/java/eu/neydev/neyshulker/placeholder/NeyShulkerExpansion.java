@@ -74,11 +74,8 @@ public class NeyShulkerExpansion extends PlaceholderExpansion {
         ShulkerSession session = plugin.getServices().getSessionRegistry().getSession(online);
 
         return switch (key) {
-
             case "open" -> String.valueOf(session != null);
-
             case "name" -> session == null ? "" : session.getShulkerName();
-
             case "slot" -> session == null ? "" : String.valueOf(session.getSlot());
 
             case "free_slots" -> session == null ? ""
@@ -93,7 +90,6 @@ public class NeyShulkerExpansion extends PlaceholderExpansion {
                     : String.valueOf(countItems(session));
 
             default -> null;
-
         };
 
     }
@@ -107,11 +103,9 @@ public class NeyShulkerExpansion extends PlaceholderExpansion {
         int free = 0;
 
         for (int i = 0; i < session.inventory().getSize(); i++) {
-
             if (ShulkerUtil.isEmpty(session.inventory().getItem(i))) {
                 free++;
             }
-
         }
 
         return free;
@@ -135,4 +129,5 @@ public class NeyShulkerExpansion extends PlaceholderExpansion {
         return amount;
 
     }
+
 }

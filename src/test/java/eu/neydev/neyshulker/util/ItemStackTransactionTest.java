@@ -101,7 +101,6 @@ class ItemStackTransactionTest {
         ItemStack destination = new FakeItemStack(Material.DIAMOND, 10);
 
         ItemStack sourceReference = source;
-
         ItemStackTransaction.move(source, destination, 64);
 
         assertSame(sourceReference, source);
@@ -135,7 +134,6 @@ class ItemStackTransactionTest {
         slots[1] = new FakeItemStack(Material.DIAMOND, 64);
 
         ItemStack rest = ItemStackTransaction.insert(slots, new FakeItemStack(Material.DIAMOND, 5), 2);
-
         assertEquals(5, rest.getAmount());
 
     }
@@ -183,16 +181,13 @@ class ItemStackTransactionTest {
         int incomingAmount = incoming.getAmount();
 
         ItemStack rest = ItemStackTransaction.insert(slots, incoming, slots.length);
-
         int finalTotal = rest == null ? 0 : rest.getAmount();
 
         for (ItemStack slot : slots) {
-
             if (slot != null) {
                 finalTotal += slot.getAmount();
                 assertTrue(slot.getAmount() <= slot.getMaxStackSize(), "Превышен размер стека");
             }
-
         }
 
         assertEquals(initialTotal + incomingAmount, finalTotal, "Нарушен баланс предметов");
@@ -233,4 +228,5 @@ class ItemStackTransactionTest {
     private int amountOf(ItemStack itemStack) {
         return itemStack == null ? 0 : itemStack.getAmount();
     }
+
 }

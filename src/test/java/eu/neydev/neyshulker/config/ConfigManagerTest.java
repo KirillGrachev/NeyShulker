@@ -47,7 +47,6 @@ class ConfigManagerTest {
         when(plugin.getDataFolder()).thenReturn(tempDir.toFile());
         when(plugin.getLogger()).thenReturn(countingLogger());
         when(plugin.getConfig()).thenReturn(new YamlConfiguration());
-
         return plugin;
 
     }
@@ -61,17 +60,17 @@ class ConfigManagerTest {
 
             @Override
             public void publish(LogRecord record) {
+
                 consoleRecords.add(record);
+
             }
 
             @Override
             public void flush() {
-
             }
 
             @Override
             public void close() {
-
             }
         });
 
@@ -149,7 +148,6 @@ class ConfigManagerTest {
                   enabled: true
                   use: "custom.use"
                 """);
-
         ConfigManager config = configManager(plugin());
 
         assertFalse(config.isPluginEnabled());
@@ -204,7 +202,6 @@ class ConfigManagerTest {
                 """);
 
         ConfigManager config = configManager(plugin());
-
         List<String> lines = config.getMessages(MessageKey.INFO_IDLE);
 
         assertEquals(2, lines.size(), "Очередь - техническая деталь волн, в чате ее больше нет");
@@ -222,7 +219,6 @@ class ConfigManagerTest {
         AtomicInteger calls = new AtomicInteger();
 
         config.onReload(calls::incrementAndGet);
-
         assertEquals(OpenMethodType.ALWAYS, config.getOpenMethod());
 
         writeConfig("settings:\n  shulker:\n    open_method: NO_SHIFT\n");
@@ -243,7 +239,6 @@ class ConfigManagerTest {
                     blocked_items:
                       enabled: false
                 """);
-
         ConfigManager config = configManager(plugin());
 
         assertFalse(config.isBlacklistEnabled());
@@ -262,7 +257,6 @@ class ConfigManagerTest {
                       mode: ORIGINAL
                       format: "unused {shulker_name}"
                 """);
-
         ConfigManager config = configManager(plugin());
 
         assertEquals(TitleMode.ORIGINAL, config.getTitleMode());
@@ -279,7 +273,6 @@ class ConfigManagerTest {
                   shulker:
                     title: " &#ff00ff{shulker_name} "
                 """);
-
         ConfigManager config = configManager(plugin());
 
         assertEquals(TitleMode.CUSTOM, config.getTitleMode());
@@ -297,7 +290,6 @@ class ConfigManagerTest {
                     title:
                       mode: RAINBOW
                 """);
-
         ConfigManager config = configManager(plugin());
 
         assertEquals(TitleMode.CUSTOM, config.getTitleMode());
@@ -324,7 +316,6 @@ class ConfigManagerTest {
                   open:
                     sound: NOT_A_SOUND
                 """);
-
         ConfigManager config = configManager(plugin());
 
         assertEquals(OpenMethodType.AIR, config.getOpenMethod());
@@ -353,7 +344,6 @@ class ConfigManagerTest {
                     blacklist:
                       - "BARRIER"
                 """);
-
         ConfigManager config = configManager(plugin());
 
         assertTrue(config.isBlacklisted(Material.STONE));
@@ -373,7 +363,6 @@ class ConfigManagerTest {
                     rules:
                       fill_order: COMPACT
                 """);
-
         assertEquals(FillOrderType.COMPACT, configManager(plugin()).getAutoCollectFillOrder());
 
         writeConfig("""
@@ -403,7 +392,6 @@ class ConfigManagerTest {
                         default: "Shulker Box"
                         RU_RU: "Шалкеровый ящик"
                 """);
-
         ConfigManager config = configManager(plugin());
 
         assertEquals("Shulker Box", config.getTitleNames().get("default"));
@@ -411,4 +399,5 @@ class ConfigManagerTest {
                 "Ключи языков приводятся к нижнему регистру");
 
     }
+
 }

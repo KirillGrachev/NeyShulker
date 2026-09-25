@@ -48,4 +48,5 @@ public class ShulkerCloseEvent extends NeyShulkerEvent {
     public static @NotNull HandlerList getHandlerList() {
         return HANDLERS;
     }
+
 }

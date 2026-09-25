@@ -48,4 +48,5 @@ public class SoundService {
     public void playCollect(@Nullable Player player) {
         play(player, configManager.getCollectSound());
     }
+
 }

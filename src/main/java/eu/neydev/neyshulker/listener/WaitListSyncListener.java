@@ -40,20 +40,16 @@ public class WaitListSyncListener implements Listener {
 
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = false)
     public void onInventoryClick(@NotNull InventoryClickEvent event) {
-
         if (event.getWhoClicked() instanceof Player player) {
             autoCollectService.syncWaitList(player);
         }
-
     }
 
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = false)
     public void onInventoryDrag(@NotNull InventoryDragEvent event) {
-
         if (event.getWhoClicked() instanceof Player player) {
             autoCollectService.syncWaitList(player);
         }
-
     }
 
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = false)
@@ -89,4 +85,5 @@ public class WaitListSyncListener implements Listener {
     public void onDeath(@NotNull PlayerDeathEvent event) {
         autoCollectService.clearWaitList(event.getEntity());
     }
+
 }

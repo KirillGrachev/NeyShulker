@@ -26,9 +26,7 @@ class SessionRegistryTest {
     private Player player() {
 
         Player player = mock(Player.class);
-
         when(player.getUniqueId()).thenReturn(UUID.randomUUID());
-
         return player;
 
     }
@@ -36,9 +34,7 @@ class SessionRegistryTest {
     private ItemStack shulker() {
 
         ItemStack shulker = mock(ItemStack.class);
-
         when(shulker.clone()).thenReturn(shulker);
-
         return shulker;
 
     }
@@ -89,7 +85,6 @@ class SessionRegistryTest {
         assertTrue(registry.getSession(second) != null);
 
         registry.clear();
-
         assertTrue(registry.isEmpty());
 
     }
@@ -97,4 +92,5 @@ class SessionRegistryTest {
     private static void assertNotNull(Object value) {
         org.junit.jupiter.api.Assertions.assertNotNull(value);
     }
+
 }

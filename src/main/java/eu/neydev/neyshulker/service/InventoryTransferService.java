@@ -39,7 +39,6 @@ public class InventoryTransferService {
         }
 
         resync(player);
-
         return inserted;
 
     }
@@ -85,4 +84,5 @@ public class InventoryTransferService {
         player.updateInventory();
 
     }
+
 }

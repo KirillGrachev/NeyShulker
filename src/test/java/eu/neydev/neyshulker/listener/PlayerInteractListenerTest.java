@@ -68,7 +68,6 @@ class PlayerInteractListenerTest {
         when(configManager.isPluginEnabled()).thenReturn(true);
         when(player.getInventory()).thenReturn(inventory);
         when(player.getItemOnCursor()).thenReturn(null);
-
         return new PlayerInteractListener(plugin);
 
     }
@@ -80,7 +79,6 @@ class PlayerInteractListenerTest {
         when(event.getAction()).thenReturn(action);
         when(event.getHand()).thenReturn(EquipmentSlot.HAND);
         when(event.getPlayer()).thenReturn(player);
-
         return event;
 
     }
@@ -90,9 +88,7 @@ class PlayerInteractListenerTest {
     void ignoresWrongActions() {
 
         PlayerInteractListener listener = listener();
-
         listener.onPlayerInteract(event(Action.LEFT_CLICK_AIR));
-
         verify(validationService, never()).canOpen(any(), any(), any());
 
     }
@@ -108,7 +104,6 @@ class PlayerInteractListenerTest {
                 .thenReturn(ValidationResult.denied(ValidationReason.METHOD_MISMATCH));
 
         PlayerInteractEvent event = event(Action.RIGHT_CLICK_BLOCK);
-
         listener().onPlayerInteract(event);
 
         verify(event, never()).setCancelled(true);
@@ -151,9 +146,7 @@ class PlayerInteractListenerTest {
         try (MockedStatic<Bukkit> bukkit = mockStatic(Bukkit.class)) {
 
             bukkit.when(Bukkit::getScheduler).thenReturn(scheduler);
-
             PlayerInteractEvent event = event(Action.RIGHT_CLICK_AIR);
-
             listener().onPlayerInteract(event);
 
             verify(event).setCancelled(true);
@@ -182,19 +175,14 @@ class PlayerInteractListenerTest {
         try (MockedStatic<Bukkit> bukkit = mockStatic(Bukkit.class)) {
 
             bukkit.when(Bukkit::getScheduler).thenReturn(scheduler);
-
             PlayerInteractEvent event = event(Action.RIGHT_CLICK_AIR);
-
             when(event.getHand()).thenReturn(EquipmentSlot.OFF_HAND);
-
             listener().onPlayerInteract(event);
-
             verify(scheduler).runTask(any(org.bukkit.plugin.Plugin.class), task.capture());
 
         }
 
         task.getValue().run();
-
         verify(openService).open(player, shulker, 40);
 
     }
@@ -207,7 +195,6 @@ class PlayerInteractListenerTest {
         inventory.setItem(0, shulker);
 
         when(sessionRegistry.hasSession(player.getUniqueId())).thenReturn(true);
-
         listener().onPlayerInteract(event(Action.RIGHT_CLICK_AIR));
 
         verify(validationService, never()).canOpen(any(), any(), any());
@@ -220,12 +207,11 @@ class PlayerInteractListenerTest {
     void cursorItemBlocksOpen() {
 
         PlayerInteractListener listener = listener();
-
         when(player.getItemOnCursor()).thenReturn(new FakeItemStack(Material.STONE, 1));
 
         listener.onPlayerInteract(event(Action.RIGHT_CLICK_AIR));
-
         verify(validationService, never()).canOpen(any(), any(), any());
 
     }
+
 }

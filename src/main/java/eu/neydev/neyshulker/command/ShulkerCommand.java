@@ -56,17 +56,11 @@ public class ShulkerCommand implements TabExecutor {
         }
 
         switch (args[0].toLowerCase(Locale.ROOT)) {
-
             case "reload" -> handleReload(sender);
-
             case "open" -> handleOpen(sender);
-
             case "info" -> handleInfo(sender);
-
             case "autocollect" -> handleAutoCollect(sender);
-
             default -> messageService.send(sender, MessageKey.USAGE, Map.of());
-
         }
 
         return true;
@@ -87,7 +81,6 @@ public class ShulkerCommand implements TabExecutor {
 
     }
 
-
     private void handleReload(@NotNull CommandSender sender) {
 
         if (!permissionService.has(sender, PermissionNode.RELOAD)) {
@@ -96,7 +89,6 @@ public class ShulkerCommand implements TabExecutor {
         }
 
         plugin.getConfigManager().reload();
-
         messageService.send(sender, MessageKey.RELOAD, Map.of());
 
     }
@@ -118,10 +110,8 @@ public class ShulkerCommand implements TabExecutor {
 
         // Вторая рука - полноценный источник открытия, как и в интеракте
         if (!ShulkerUtil.isShulkerBox(item)) {
-
             slot = ShulkerUtil.OFF_HAND_SLOT;
             item = player.getInventory().getItem(slot);
-
         }
 
         if (!ShulkerUtil.isShulkerBox(item)) {
@@ -151,7 +141,6 @@ public class ShulkerCommand implements TabExecutor {
 
             messageService.send(player, MessageKey.INFO_IDLE, Map.of(
                     "state", state(autoCollectActive)));
-
             return;
 
         }
@@ -164,6 +153,7 @@ public class ShulkerCommand implements TabExecutor {
                 "slot", String.valueOf(session.getSlot()),
                 "free", String.valueOf(freeSlots),
                 "size", String.valueOf(ShulkerUtil.SHULKER_SIZE),
+
                 "items", String.valueOf(ShulkerUtil.countItems(shulker)),
                 "seconds", String.valueOf((System.currentTimeMillis() - session.openedAt()) / 1000L)));
 
@@ -182,7 +172,6 @@ public class ShulkerCommand implements TabExecutor {
         }
 
         boolean enabled = autoCollectService.toggle(player);
-
         messageService.send(player, enabled ? MessageKey.AUTO_COLLECT_ON : MessageKey.AUTO_COLLECT_OFF);
 
     }
@@ -193,11 +182,9 @@ public class ShulkerCommand implements TabExecutor {
         List<String> result = new ArrayList<>();
 
         for (String value : source) {
-
             if (value.toLowerCase(Locale.ROOT).startsWith(prefix)) {
                 result.add(value);
             }
-
         }
 
         return result;
@@ -216,4 +203,5 @@ public class ShulkerCommand implements TabExecutor {
         return String.join(" ", messageService.build(
                 enabled ? MessageKey.STATE_ON : MessageKey.STATE_OFF, Map.of()));
     }
+
 }

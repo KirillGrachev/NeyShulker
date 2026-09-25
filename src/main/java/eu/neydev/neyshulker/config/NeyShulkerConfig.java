@@ -19,14 +19,10 @@ import java.util.Set;
  */
 public interface NeyShulkerConfig {
 
-
     boolean isPluginEnabled();
 
-
     OpenMethodType getOpenMethod();
-
     TitleMode getTitleMode();
-
     String getTitleFormat();
 
     /**
@@ -37,26 +33,16 @@ public interface NeyShulkerConfig {
     Map<String, String> getTitleNames();
 
     int getSaveInterval();
-
     boolean isBlacklistEnabled();
-
     Set<Material> getBlacklistedMaterials();
-
     boolean isBlacklisted(Material material);
 
-
     boolean isAutoCollectEnabled();
-
     boolean isAutoCollectPermissionRequired();
-
     double getAutoCollectMaxDistance();
-
     int getWavePeriod();
-
     int getPlayersPerWave();
-
     int getActionsPerWave();
-
     int getQueuePerPlayer();
 
     /**
@@ -66,11 +52,8 @@ public interface NeyShulkerConfig {
     int getFullMessageCooldown();
 
     boolean isAutoCollectOnlyWhenInventoryFull();
-
     boolean isAutoCollectMergeIntoExisting();
-
     CollectMode getAutoCollectMode();
-
     boolean isAutoCollectIgnorePickupDelay();
 
     /**
@@ -84,32 +67,20 @@ public interface NeyShulkerConfig {
     double getAutoCollectRespectNearbyPlayers();
 
     FillOrderType getAutoCollectFillOrder();
-
     List<Material> getAutoCollectPriorityItems();
-
     Set<Material> getAutoCollectBlacklist();
-
     boolean isAutoCollectBlacklisted(Material material);
 
-
     boolean areMessagesEnabled();
-
     String getMessagePrefix();
-
     List<String> getMessages(MessageKey key);
 
-
     SoundSettings getOpenSound();
-
     SoundSettings getCloseSound();
-
     SoundSettings getCollectSound();
 
-
     boolean arePermissionsEnabled();
-
     boolean isPermissionOpBypass();
-
     String getPermission(PermissionNode node);
 
 }

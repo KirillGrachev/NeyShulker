@@ -62,16 +62,13 @@ class AutoCollectServiceTest {
     void thrownDropIsNotCollected() {
 
         when(configManager.isAutoCollectIgnorePlayerDropped()).thenReturn(true);
-
         dropTracker.mark(drop);
 
         playerInventory.setItem(0, shulker);
         when(playerInventory.getContents()).thenReturn(new ItemStack[]{shulker});
 
         AutoCollectService service = service();
-
         service.collectAround(player);
-
         verify(drop, never()).remove();
 
     }
@@ -87,9 +84,7 @@ class AutoCollectServiceTest {
         when(playerInventory.getContents()).thenReturn(new ItemStack[]{shulker});
 
         AutoCollectService service = service();
-
         service.collectAround(player);
-
         verify(drop, never()).remove();
 
     }
@@ -99,9 +94,7 @@ class AutoCollectServiceTest {
     void dropNearOtherPlayerIsNotCollected() {
 
         when(configManager.getAutoCollectRespectNearbyPlayers()).thenReturn(4.5D);
-
         Location at = drop.getLocation();
-
         Player other = mock(Player.class);
 
         when(other.isOnline()).thenReturn(true);
@@ -111,11 +104,8 @@ class AutoCollectServiceTest {
         when(playerInventory.getContents()).thenReturn(new ItemStack[]{shulker});
 
         AutoCollectService service = service();
-
         when(player.getWorld().getPlayers()).thenReturn(List.of(player, other));
-
         service.collectAround(player);
-
         verify(drop, never()).remove();
 
     }
@@ -125,11 +115,8 @@ class AutoCollectServiceTest {
     void distantPlayerDoesNotBlockCollect() {
 
         when(configManager.getAutoCollectRespectNearbyPlayers()).thenReturn(4.5D);
-
         Location far = mock(Location.class);
-
         when(far.distanceSquared(drop.getLocation())).thenReturn(100.0D);
-
         Player other = mock(Player.class);
 
         when(other.isOnline()).thenReturn(true);
@@ -139,15 +126,12 @@ class AutoCollectServiceTest {
         when(playerInventory.getContents()).thenReturn(new ItemStack[]{shulker});
 
         AutoCollectService service = service();
-
         when(player.getWorld().getPlayers()).thenReturn(List.of(player, other));
-
         PluginManager pluginManager = mock(PluginManager.class);
 
         try (MockedStatic<Bukkit> bukkit = mockStatic(Bukkit.class)) {
 
             bukkit.when(Bukkit::getPluginManager).thenReturn(pluginManager);
-
             service.collectAround(player);
 
         }
@@ -167,15 +151,12 @@ class AutoCollectServiceTest {
         when(playerInventory.getContents()).thenReturn(new ItemStack[]{shulker});
 
         AutoCollectService service = service();
-
         when(player.getWorld().getPlayers()).thenReturn(List.of(player));
-
         PluginManager pluginManager = mock(PluginManager.class);
 
         try (MockedStatic<Bukkit> bukkit = mockStatic(Bukkit.class)) {
 
             bukkit.when(Bukkit::getPluginManager).thenReturn(pluginManager);
-
             service.collectAround(player);
 
         }
@@ -199,7 +180,6 @@ class AutoCollectServiceTest {
         when(shulker.getType()).thenReturn(Material.WHITE_SHULKER_BOX);
         when(shulker.clone()).thenReturn(shulker);
         when(shulker.getItemMeta()).thenReturn(meta);
-
         return shulker;
 
     }
@@ -210,7 +190,6 @@ class AutoCollectServiceTest {
         Location playerLocation = mock(Location.class);
 
         when(dropLocation.distanceSquared(playerLocation)).thenReturn(1.0D);
-
         Item drop = mock(Item.class);
 
         when(drop.isDead()).thenReturn(false);
@@ -222,7 +201,6 @@ class AutoCollectServiceTest {
         when(drop.getItemStack()).thenReturn(new FakeItemStack(Material.DIAMOND, 3));
 
         when(player.getLocation()).thenReturn(playerLocation);
-
         return drop;
 
     }
@@ -230,7 +208,6 @@ class AutoCollectServiceTest {
     private AutoCollectService service() {
 
         NeyShulker plugin = mock(NeyShulker.class);
-
         when(plugin.getLogger()).thenReturn(java.util.logging.Logger.getLogger("autocollect-test"));
 
         when(configManager.isPluginEnabled()).thenReturn(true);
@@ -281,7 +258,6 @@ class AutoCollectServiceTest {
         try (MockedStatic<Bukkit> bukkit = mockStatic(Bukkit.class)) {
 
             bukkit.when(Bukkit::getPluginManager).thenReturn(pluginManager);
-
             service().collectAround(player);
 
         }
@@ -311,7 +287,6 @@ class AutoCollectServiceTest {
         try (MockedStatic<Bukkit> bukkit = mockStatic(Bukkit.class)) {
 
             bukkit.when(Bukkit::getPluginManager).thenReturn(pluginManager);
-
             service().collectAround(player);
 
         }
@@ -333,7 +308,6 @@ class AutoCollectServiceTest {
         when(second.getOwner()).thenReturn(null);
         when(second.getLocation()).thenReturn(dropLocation);
         when(second.getItemStack()).thenReturn(new FakeItemStack(Material.DIAMOND, 2));
-
         return second;
 
     }
@@ -343,7 +317,6 @@ class AutoCollectServiceTest {
     void mergeIntoFullBoxWithMatchingType() {
 
         ItemStack[] full = new ItemStack[ShulkerUtil.SHULKER_SIZE];
-
         full[0] = new FakeItemStack(Material.DIAMOND, 60);
 
         for (int i = 1; i < full.length; i++) {
@@ -364,7 +337,6 @@ class AutoCollectServiceTest {
         try (MockedStatic<Bukkit> bukkit = mockStatic(Bukkit.class)) {
 
             bukkit.when(Bukkit::getPluginManager).thenReturn(pluginManager);
-
             service.collectAround(player);
 
         }
@@ -381,7 +353,6 @@ class AutoCollectServiceTest {
     void mergeDisabledSkipsFullBox() {
 
         ItemStack[] full = new ItemStack[ShulkerUtil.SHULKER_SIZE];
-
         full[0] = new FakeItemStack(Material.DIAMOND, 60);
 
         for (int i = 1; i < full.length; i++) {
@@ -393,11 +364,8 @@ class AutoCollectServiceTest {
         when(playerInventory.getContents()).thenReturn(new ItemStack[]{shulker});
 
         AutoCollectService service = service();
-
         when(configManager.isAutoCollectMergeIntoExisting()).thenReturn(false);
-
         service.collectAround(player);
-
         verify(drop, never()).remove();
 
     }
@@ -424,7 +392,6 @@ class AutoCollectServiceTest {
         try (MockedStatic<Bukkit> bukkit = mockStatic(Bukkit.class)) {
 
             bukkit.when(Bukkit::getPluginManager).thenReturn(pluginManager);
-
             service.collectAround(player);
 
         }
@@ -444,11 +411,8 @@ class AutoCollectServiceTest {
         when(playerInventory.getContents()).thenReturn(new ItemStack[]{shulker});
 
         AutoCollectService service = service();
-
         service.toggle(player);
-
         service.collectAround(player);
-
         verify(drop, never()).remove();
 
     }
@@ -467,7 +431,6 @@ class AutoCollectServiceTest {
         when(configManager.isAutoCollectOnlyWhenInventoryFull()).thenReturn(true);
 
         service.collectAround(player);
-
         verify(drop, never()).remove();
 
     }
@@ -488,7 +451,6 @@ class AutoCollectServiceTest {
         try (MockedStatic<Bukkit> bukkit = mockStatic(Bukkit.class)) {
 
             bukkit.when(Bukkit::getPluginManager).thenReturn(pluginManager);
-
             service().collectAround(player);
 
         }
@@ -510,7 +472,6 @@ class AutoCollectServiceTest {
         try (MockedStatic<Bukkit> bukkit = mockStatic(Bukkit.class)) {
 
             bukkit.when(Bukkit::getPluginManager).thenReturn(pluginManager);
-
             service().collectAround(player);
 
         }
@@ -540,9 +501,7 @@ class AutoCollectServiceTest {
         when(drop.getItemStack()).thenReturn(new FakeItemStack(Material.COBBLESTONE, 4));
 
         Item dirt = secondDrop();
-
         when(dirt.getItemStack()).thenReturn(new FakeItemStack(Material.DIRT, 3));
-
         AutoCollectService service = service();
 
         // Мир stub-ится после сервиса: service() ставит свой мир по умолчанию
@@ -556,7 +515,6 @@ class AutoCollectServiceTest {
         try (MockedStatic<Bukkit> bukkit = mockStatic(Bukkit.class)) {
 
             bukkit.when(Bukkit::getPluginManager).thenReturn(pluginManager);
-
             service.collectAround(player);
 
         }
@@ -572,7 +530,6 @@ class AutoCollectServiceTest {
     void inventoryMatchingSortsKnownType() {
 
         ItemStack[] boxStacks = new ItemStack[ShulkerUtil.SHULKER_SIZE];
-
         boxStacks[0] = new FakeItemStack(Material.COBBLESTONE, 60);
 
         for (int i = 1; i < boxStacks.length; i++) {
@@ -587,7 +544,6 @@ class AutoCollectServiceTest {
         playerInventory.setItem(6, new FakeItemStack(Material.DIAMOND, 2));
 
         AutoCollectService service = service();
-
         org.bukkit.World world = mock(org.bukkit.World.class);
 
         when(world.getEntitiesByClass(Item.class)).thenReturn(List.of());
@@ -597,7 +553,6 @@ class AutoCollectServiceTest {
         try (MockedStatic<Bukkit> bukkit = mockStatic(Bukkit.class)) {
 
             bukkit.when(Bukkit::getPluginManager).thenReturn(pluginManager);
-
             service.collectAround(player);
 
         }
@@ -626,7 +581,6 @@ class AutoCollectServiceTest {
         when(playerInventory.getContents()).thenReturn(new ItemStack[]{shulker});
 
         playerInventory.setItem(9, new FakeItemStack(Material.COBBLESTONE, 4));
-
         AutoCollectService service = service();
 
         when(configManager.getAutoCollectMode())
@@ -642,7 +596,6 @@ class AutoCollectServiceTest {
         try (MockedStatic<Bukkit> bukkit = mockStatic(Bukkit.class)) {
 
             bukkit.when(Bukkit::getPluginManager).thenReturn(pluginManager);
-
             service.collectAround(player);
 
         }
@@ -662,9 +615,7 @@ class AutoCollectServiceTest {
         when(playerInventory.getContents()).thenReturn(new ItemStack[]{shulker});
 
         playerInventory.setItem(6, new FakeItemStack(Material.DIAMOND, 2));
-
         AutoCollectService service = service();
-
         org.bukkit.World world = mock(org.bukkit.World.class);
 
         when(world.getEntitiesByClass(Item.class)).thenReturn(List.of());
@@ -678,7 +629,6 @@ class AutoCollectServiceTest {
         try (MockedStatic<Bukkit> bukkit = mockStatic(Bukkit.class)) {
 
             bukkit.when(Bukkit::getPluginManager).thenReturn(pluginManager);
-
             service.collectAround(player);
 
         }
@@ -697,23 +647,19 @@ class AutoCollectServiceTest {
         when(playerInventory.getContents()).thenReturn(new ItemStack[]{shulker});
 
         playerInventory.setItem(6, new FakeItemStack(Material.DIAMOND, 2));
-
         AutoCollectService service = service();
 
         when(configManager.getAutoCollectMode())
                 .thenReturn(eu.neydev.neyshulker.config.type.CollectMode.MATCHING);
 
         org.bukkit.World world = mock(org.bukkit.World.class);
-
         when(world.getEntitiesByClass(Item.class)).thenReturn(List.of(drop));
         when(player.getWorld()).thenReturn(world);
-
         PluginManager pluginManager = mock(PluginManager.class);
 
         try (MockedStatic<Bukkit> bukkit = mockStatic(Bukkit.class)) {
 
             bukkit.when(Bukkit::getPluginManager).thenReturn(pluginManager);
-
             service.collectAround(player);
 
         }
@@ -728,10 +674,9 @@ class AutoCollectServiceTest {
     void noShulkerNoCollection() {
 
         when(playerInventory.getContents()).thenReturn(new ItemStack[0]);
-
         service().collectAround(player);
-
         verify(drop, never()).remove();
 
     }
+
 }

@@ -21,7 +21,6 @@ public class ShulkerContentService {
     public void loadInto(@Nullable ItemStack shulker, @NotNull Inventory inventory) {
 
         inventory.clear();
-
         ItemStack[] contents = ShulkerUtil.readContents(shulker);
 
         if (contents == null) {
@@ -29,11 +28,9 @@ public class ShulkerContentService {
         }
 
         for (int i = 0; i < contents.length && i < inventory.getSize(); i++) {
-
             if (!ShulkerUtil.isEmpty(contents[i])) {
                 inventory.setItem(i, contents[i]);
             }
-
         }
 
     }
@@ -62,4 +59,5 @@ public class ShulkerContentService {
         return snapshot;
 
     }
+
 }

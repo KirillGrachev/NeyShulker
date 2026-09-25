@@ -23,10 +23,9 @@ class PlayerDropTrackerTest {
     private Item item() {
 
         Item item = mock(Item.class);
-
         when(item.getUniqueId()).thenReturn(UUID.randomUUID());
-
         return item;
+
     }
 
     @Test
@@ -34,10 +33,9 @@ class PlayerDropTrackerTest {
     void markedDropIsPlayerDropped() {
 
         Item drop = item();
-
         tracker.mark(drop);
-
         assertTrue(tracker.isPlayerDropped(drop));
+
     }
 
     @Test
@@ -56,6 +54,7 @@ class PlayerDropTrackerTest {
         clock.addAndGet(300_001L);
 
         assertFalse(tracker.isPlayerDropped(drop));
+
     }
 
     @Test
@@ -74,6 +73,7 @@ class PlayerDropTrackerTest {
 
         assertFalse(tracker.isPlayerDropped(expired));
         assertTrue(tracker.isPlayerDropped(fresh));
+
     }
 
     @Test
@@ -86,5 +86,7 @@ class PlayerDropTrackerTest {
         tracker.clear();
 
         assertFalse(tracker.isPlayerDropped(drop));
+
     }
+
 }

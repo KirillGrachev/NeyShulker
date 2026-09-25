@@ -125,9 +125,7 @@ public class ShulkerPersistenceService {
             return false;
 
         } finally {
-
             session.saving().set(false);
-
         }
 
     }
@@ -284,8 +282,7 @@ public class ShulkerPersistenceService {
     private void writeBack(@NotNull Player player,
                            int slot,
                            @NotNull ItemStack saved) {
-
         player.getInventory().setItem(slot, saved);
-
     }
+
 }

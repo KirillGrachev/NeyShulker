@@ -60,7 +60,6 @@ public final class NearbyItemsFinder {
         }
 
         sortByPriority(items);
-
         return items;
 
     }
@@ -79,4 +78,5 @@ public final class NearbyItemsFinder {
         ));
 
     }
+
 }

@@ -33,9 +33,7 @@ class ShulkerCloseServiceTest {
     private static Player player() {
 
         Player player = mock(Player.class);
-
         when(player.getUniqueId()).thenReturn(java.util.UUID.randomUUID());
-
         return player;
 
     }
@@ -61,7 +59,6 @@ class ShulkerCloseServiceTest {
         when(server.getPluginManager()).thenReturn(pluginManager);
         when(plugin.getServer()).thenReturn(server);
         when(plugin.getLogger()).thenReturn(java.util.logging.Logger.getLogger("close-test"));
-
         return plugin;
 
     }
@@ -117,4 +114,5 @@ class ShulkerCloseServiceTest {
                 org.mockito.ArgumentMatchers.eq(false));
 
     }
+
 }

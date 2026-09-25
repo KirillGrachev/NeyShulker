@@ -20,7 +20,6 @@ public final class HexColorUtil {
     private static final Pattern HEX_PATTERN = Pattern.compile("([&§])?#[a-fA-F0-9]{6}");
 
     private HexColorUtil() {
-
     }
 
     /**
@@ -54,7 +53,6 @@ public final class HexColorUtil {
         } while (matcher.find());
 
         result.append(text.substring(lastEnd));
-
         return ChatColor.translateAlternateColorCodes('&', result.toString());
 
     }
@@ -94,4 +92,5 @@ public final class HexColorUtil {
         return replacement.toString();
 
     }
+
 }

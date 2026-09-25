@@ -64,7 +64,6 @@ class ShulkerPersistenceServiceTest {
         when(shulker.getType()).thenReturn(Material.WHITE_SHULKER_BOX);
         when(shulker.clone()).thenAnswer(answer -> shulker);
         when(shulker.getItemMeta()).thenReturn(meta);
-
         return shulker;
 
     }
@@ -77,7 +76,6 @@ class ShulkerPersistenceServiceTest {
         when(player.getUniqueId()).thenReturn(UUID.randomUUID());
         when(player.getInventory()).thenReturn(inventory);
         when(player.getName()).thenReturn("NeyTM");
-
         return player;
 
     }
@@ -95,7 +93,6 @@ class ShulkerPersistenceServiceTest {
         Player player = player(playerInventory);
 
         playerInventory.setItem(0, shulker);
-
         ShulkerSession session = sessionRegistry.createSession(player, shulker, 0, () -> gui);
 
         try (MockedStatic<Bukkit> bukkit = mockStatic(Bukkit.class)) {
@@ -140,7 +137,9 @@ class ShulkerPersistenceServiceTest {
         verify(player, times(1)).closeInventory();
 
         // Консольных уведомлений о detach нет: поведение тихое по решению владельца
+
         verify(player, times(1)).closeInventory();
 
     }
+
 }

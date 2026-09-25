@@ -48,12 +48,10 @@ public class RepeatingTask {
      * Останавливает задачу, если она запущена.
      */
     public void stop() {
-
         if (task != null) {
             task.cancel();
             task = null;
         }
-
     }
 
     public boolean isRunning() {
@@ -63,4 +61,5 @@ public class RepeatingTask {
     public @NotNull String getName() {
         return name;
     }
+
 }

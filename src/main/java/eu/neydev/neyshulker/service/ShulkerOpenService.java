@@ -96,7 +96,6 @@ public class ShulkerOpenService {
 
             persistenceService.scheduleAutoSave(session);
             soundService.playOpen(player);
-
             return true;
 
         } catch (RuntimeException exception) {
@@ -104,7 +103,6 @@ public class ShulkerOpenService {
             plugin.getLogger().severe("Failed to open a shulker box: " + exception.getMessage());
             messageService.send(player, MessageKey.OPEN_ERROR, Map.of());
             rollback(player);
-
             return false;
 
         }
@@ -127,9 +125,7 @@ public class ShulkerOpenService {
                                   @NotNull ItemStack shulker) {
 
         ShulkerOpenEvent event = new ShulkerOpenEvent(player, session, shulker);
-
         plugin.getServer().getPluginManager().callEvent(event);
-
         return !event.isCancelled();
 
     }
@@ -140,4 +136,5 @@ public class ShulkerOpenService {
         player.closeInventory();
 
     }
+
 }

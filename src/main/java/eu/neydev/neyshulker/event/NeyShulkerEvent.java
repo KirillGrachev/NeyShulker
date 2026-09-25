@@ -23,4 +23,5 @@ public abstract class NeyShulkerEvent extends Event {
 
     @Override
     public abstract @NotNull HandlerList getHandlers();
+
 }

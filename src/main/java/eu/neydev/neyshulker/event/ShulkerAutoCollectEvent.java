@@ -61,4 +61,5 @@ public class ShulkerAutoCollectEvent extends NeyShulkerEvent implements Cancella
     public static @NotNull HandlerList getHandlerList() {
         return HANDLERS;
     }
+
 }

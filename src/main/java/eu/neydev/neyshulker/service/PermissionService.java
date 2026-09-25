@@ -72,11 +72,9 @@ public class PermissionService {
      * @return true если проверки прав для него не действуют
      */
     private boolean isOpBypass(@Nullable CommandSender sender) {
-
         return configManager.isPermissionOpBypass()
                 && sender != null
                 && (sender.isOp() || sender instanceof ConsoleCommandSender);
-
     }
 
     /**
@@ -103,4 +101,5 @@ public class PermissionService {
                 && player.hasPermission(configManager.getPermission(PermissionNode.BYPASS_BLACKLIST));
 
     }
+
 }

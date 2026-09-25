@@ -49,11 +49,9 @@ public class FakeItemStack extends ItemStack {
 
     @Override
     public boolean isSimilar(@Nullable ItemStack other) {
-
         return other instanceof FakeItemStack fake
                 && fake.material == material
                 && fake.maxStackSize == maxStackSize;
-
     }
 
     @Override
@@ -65,4 +63,5 @@ public class FakeItemStack extends ItemStack {
     public String toString() {
         return material.name() + " x" + amount + "/" + maxStackSize;
     }
+
 }

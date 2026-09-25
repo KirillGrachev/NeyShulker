@@ -70,7 +70,6 @@ class AutoCollectWaitListSyncTest {
         ItemStack shulker = shulker(boxContents);
 
         inventory.setItem(0, shulker);
-
         when(inventory.getContents()).thenReturn(new ItemStack[]{shulker});
 
         Location playerLocation = mock(Location.class);
@@ -90,10 +89,12 @@ class AutoCollectWaitListSyncTest {
         when(player.getItemOnCursor()).thenReturn(null);
 
         for (Item drop : drops) {
+
             Location dropLocation = mock(Location.class);
 
             when(dropLocation.distanceSquared(playerLocation)).thenReturn(1.0D);
             when(drop.getLocation()).thenReturn(dropLocation);
+
         }
 
         return new Fixture(player, inventory, boxContents, playerId);
@@ -118,13 +119,11 @@ class AutoCollectWaitListSyncTest {
 
         });
         when(meta.getBlockState()).thenReturn(box);
-
         ItemStack shulker = mock(ItemStack.class);
 
         when(shulker.getType()).thenReturn(Material.WHITE_SHULKER_BOX);
         when(shulker.clone()).thenReturn(shulker);
         when(shulker.getItemMeta()).thenReturn(meta);
-
         return shulker;
 
     }
@@ -156,7 +155,6 @@ class AutoCollectWaitListSyncTest {
     private AutoCollectService service(int actionsPerWave) {
 
         NeyShulker plugin = mock(NeyShulker.class);
-
         when(plugin.getLogger()).thenReturn(java.util.logging.Logger.getLogger("sync-test"));
 
         when(configManager.isPluginEnabled()).thenReturn(true);
@@ -188,7 +186,6 @@ class AutoCollectWaitListSyncTest {
         bukkit.when(Bukkit::getPluginManager).thenReturn(pluginManager);
         bukkit.when(Bukkit::getOnlinePlayers).thenReturn(List.of(fixture.player()));
         bukkit.when(() -> Bukkit.getPlayer(fixture.playerId())).thenReturn(fixture.player());
-
         return bukkit;
 
     }
@@ -198,9 +195,7 @@ class AutoCollectWaitListSyncTest {
     void syncRemovesEntryWhenItemLeftInventory() {
 
         Fixture fixture = fixture();
-
         fixture.inventory().setItem(5, new FakeItemStack(Material.DIAMOND, 3));
-
         AutoCollectService service = service(0);
 
         try (MockedStatic<Bukkit> ignored = bukkit(fixture)) {
@@ -211,7 +206,6 @@ class AutoCollectWaitListSyncTest {
                     "Детекция поставила предмет в очередь");
 
             fixture.inventory().setItem(5, null);
-
             service.syncWaitList(fixture.player());
 
             assertEquals(0, service.waitListSize(fixture.player()),
@@ -227,15 +221,12 @@ class AutoCollectWaitListSyncTest {
     void replacementIsQueuedOnlyByFreshDetection() {
 
         Fixture fixture = fixture();
-
         fixture.inventory().setItem(5, new FakeItemStack(Material.DIAMOND, 3));
-
         AutoCollectService service = service(0);
 
         try (MockedStatic<Bukkit> ignored = bukkit(fixture)) {
 
             service.wave();
-
             assertEquals(1, service.waitListSize(fixture.player()));
 
             // Предмет унесли, на его место положили другой стек того же типа
@@ -249,9 +240,7 @@ class AutoCollectWaitListSyncTest {
                     "Синхронизация только убирает элементы, ничего не добавляя");
 
             when(configManager.getActionsPerWave()).thenReturn(64);
-
             service.wave();
-
             ItemStack stored = fixture.boxContents().getItem(0);
 
             assertNotNull(stored, "Замена доехала в бокс через свежую детекцию");
@@ -266,24 +255,19 @@ class AutoCollectWaitListSyncTest {
     void validEntrySurvivesSync() {
 
         Fixture fixture = fixture();
-
         fixture.inventory().setItem(5, new FakeItemStack(Material.DIAMOND, 3));
-
         AutoCollectService service = service(0);
 
         try (MockedStatic<Bukkit> ignored = bukkit(fixture)) {
 
             service.wave();
-
             service.syncWaitList(fixture.player());
 
             assertEquals(1, service.waitListSize(fixture.player()),
                     "Предмет на месте - элемент остается в очереди");
 
             when(configManager.getActionsPerWave()).thenReturn(64);
-
             service.wave();
-
             ItemStack stored = fixture.boxContents().getItem(0);
 
             assertNotNull(stored);
@@ -306,16 +290,13 @@ class AutoCollectWaitListSyncTest {
         try (MockedStatic<Bukkit> ignored = bukkit(fixture)) {
 
             service.wave();
-
             assertEquals(1, service.waitListSize(fixture.player()));
-
             service.syncWaitList(fixture.player());
 
             assertEquals(1, service.waitListSize(fixture.player()),
                     "Дроп на земле не зависит от изменений инвентаря");
 
             when(configManager.getActionsPerWave()).thenReturn(64);
-
             service.wave();
 
             verify(item).remove();
@@ -333,17 +314,13 @@ class AutoCollectWaitListSyncTest {
         Fixture fixture = fixture(item);
 
         fixture.inventory().setItem(5, new FakeItemStack(Material.EMERALD, 1));
-
         AutoCollectService service = service(0);
 
         try (MockedStatic<Bukkit> ignored = bukkit(fixture)) {
 
             service.wave();
-
             assertEquals(2, service.waitListSize(fixture.player()));
-
             service.clearWaitList(fixture.player());
-
             assertEquals(0, service.waitListSize(fixture.player()));
 
         }
@@ -355,19 +332,14 @@ class AutoCollectWaitListSyncTest {
     void syncRemovesEntryBlacklistedAfterReload() {
 
         Fixture fixture = fixture();
-
         fixture.inventory().setItem(5, new FakeItemStack(Material.DIAMOND, 3));
-
         AutoCollectService service = service(0);
 
         try (MockedStatic<Bukkit> ignored = bukkit(fixture)) {
 
             service.wave();
-
             assertEquals(1, service.waitListSize(fixture.player()));
-
             when(configManager.isAutoCollectBlacklisted(Material.DIAMOND)).thenReturn(true);
-
             service.syncWaitList(fixture.player());
 
             assertEquals(0, service.waitListSize(fixture.player()),
@@ -376,4 +348,5 @@ class AutoCollectWaitListSyncTest {
         }
 
     }
+
 }

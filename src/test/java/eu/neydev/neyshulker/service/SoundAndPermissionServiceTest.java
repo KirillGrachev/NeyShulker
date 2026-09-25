@@ -36,7 +36,6 @@ class SoundAndPermissionServiceTest {
                 new SoundSettings(Sound.ENTITY_ITEM_PICKUP, true, 0.5f, 1.2f));
 
         new SoundService(configManager).playCollect(player);
-
         verify(player).playSound(eq(location), eq(Sound.ENTITY_ITEM_PICKUP), eq(0.5f), eq(1.2f));
 
     }
@@ -95,7 +94,6 @@ class SoundAndPermissionServiceTest {
     void disabledPermissionsAllowEverything() {
 
         when(configManager.arePermissionsEnabled()).thenReturn(false);
-
         PermissionService permissionService = new PermissionService(configManager);
 
         org.junit.jupiter.api.Assertions.assertTrue(permissionService.has((Player) null, PermissionNode.USE));
@@ -131,4 +129,5 @@ class SoundAndPermissionServiceTest {
         org.junit.jupiter.api.Assertions.assertFalse(permissionService.has((CommandSender) null, PermissionNode.AUTO_COLLECT));
 
     }
+
 }

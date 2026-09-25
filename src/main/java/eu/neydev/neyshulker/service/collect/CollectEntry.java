@@ -42,4 +42,5 @@ public record CollectEntry(@Nullable Item item, int slot, @NotNull Material mate
     public boolean isGround() {
         return item != null;
     }
+
 }

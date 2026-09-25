@@ -27,4 +27,5 @@ public enum ValidationReason {
     public MessageKey getMessageKey() {
         return messageKey;
     }
+
 }

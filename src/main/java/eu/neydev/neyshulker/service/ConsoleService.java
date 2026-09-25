@@ -16,7 +16,6 @@ import org.jetbrains.annotations.Nullable;
 public class ConsoleService {
 
     private static final String PATH_CONSOLE = "messages.console.";
-
     private final JavaPlugin plugin;
 
     public ConsoleService(@NotNull JavaPlugin plugin) {
@@ -80,4 +79,5 @@ public class ConsoleService {
         return result;
 
     }
+
 }

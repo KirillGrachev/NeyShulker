@@ -33,7 +33,6 @@ class ShulkerTitleServiceTest {
         when(shulker.getItemMeta()).thenReturn(meta);
         when(meta.hasDisplayName()).thenReturn(displayName != null);
         when(meta.getDisplayName()).thenReturn(displayName);
-
         return shulker;
 
     }
@@ -127,4 +126,5 @@ class ShulkerTitleServiceTest {
         assertEquals("§cMy Box", titleService.resolve(viewer, namedShulker("§cMy Box")));
 
     }
+
 }

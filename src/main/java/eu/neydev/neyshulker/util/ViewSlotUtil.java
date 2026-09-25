@@ -18,7 +18,6 @@ public final class ViewSlotUtil {
     public static final int OUTSIDE = -1;
 
     private ViewSlotUtil() {
-
     }
 
     /**
@@ -70,7 +69,6 @@ public final class ViewSlotUtil {
 
         int bottomSlot = rawSlot - topSize;
         int bottomSize = view.getBottomInventory().getSize();
-
         return bottomSlot < bottomSize ? bottomSlot : OUTSIDE;
 
     }
@@ -156,4 +154,5 @@ public final class ViewSlotUtil {
     public static @NotNull InventoryView getView(@NotNull InventoryClickEvent event) {
         return event.getView();
     }
+
 }

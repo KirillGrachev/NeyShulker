@@ -73,7 +73,6 @@ public class ShulkerCloseService {
 
         callCloseEvent(player, session);
         soundService.playClose(player);
-
         return true;
 
     }
@@ -111,4 +110,5 @@ public class ShulkerCloseService {
         plugin.getServer().getPluginManager().callEvent(
                 new ShulkerCloseEvent(player, session, session.shulkerItem()));
     }
+
 }

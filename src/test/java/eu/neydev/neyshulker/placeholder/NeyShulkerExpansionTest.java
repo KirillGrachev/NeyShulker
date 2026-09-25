@@ -36,7 +36,6 @@ class NeyShulkerExpansionTest {
         when(container.getSessionRegistry()).thenReturn(sessionRegistry);
         when(container.getAutoCollectService()).thenReturn(autoCollectService);
         when(plugin.getServices()).thenReturn(container);
-
         return new NeyShulkerExpansion(plugin);
 
     }
@@ -84,7 +83,6 @@ class NeyShulkerExpansionTest {
                 () -> TestInventories.inventory(27), 4);
 
         when(sessionRegistry.getSession(player)).thenReturn(session);
-
         NeyShulkerExpansion expansion = expansion();
 
         assertEquals("true", expansion.onRequest(player, "open"));
@@ -94,4 +92,5 @@ class NeyShulkerExpansionTest {
         assertEquals("0", expansion.onRequest(player, "items"));
 
     }
+
 }

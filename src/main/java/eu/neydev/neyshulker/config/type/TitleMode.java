@@ -30,14 +30,13 @@ public enum TitleMode {
         }
 
         for (TitleMode mode : values()) {
-
             if (mode.name().equalsIgnoreCase(value.trim())) {
                 return mode;
             }
-
         }
 
         return defaultMode;
 
     }
+
 }

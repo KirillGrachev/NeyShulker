@@ -30,4 +30,5 @@ public record ValidationResult(@NotNull ValidationReason reason) {
     public @Nullable MessageKey getMessageKey() {
         return reason.getMessageKey();
     }
+
 }

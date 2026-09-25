@@ -249,15 +249,13 @@ public class ShulkerValidationService {
             case AIR -> rightClickAir;
 
             case SHIFT -> sneaking;
-
             case NO_SHIFT -> !sneaking;
-
             case ALWAYS -> true;
 
             // Shift - явный модификатор "нужен GUI", воздух - быстрый путь
             case SMART -> sneaking || rightClickAir;
-
         };
 
     }
+
 }

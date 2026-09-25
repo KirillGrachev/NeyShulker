@@ -33,14 +33,13 @@ public enum CollectMode {
         }
 
         for (CollectMode mode : values()) {
-
             if (mode.name().equalsIgnoreCase(value.trim())) {
                 return mode;
             }
-
         }
 
         return defaultMode;
 
     }
+
 }

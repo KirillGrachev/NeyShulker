@@ -26,4 +26,5 @@ public class NeyShulkerViewer implements InventoryHolder {
     public @NotNull Inventory getInventory() {
         return inventory;
     }
+
 }

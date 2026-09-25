@@ -46,7 +46,6 @@ class WaitListSyncListenerTest {
 
         when(container.getAutoCollectService()).thenReturn(autoCollectService);
         when(plugin.getServices()).thenReturn(container);
-
         return plugin;
 
     }
@@ -84,7 +83,6 @@ class WaitListSyncListenerTest {
         when(click.getWhoClicked()).thenReturn(mock(HumanEntity.class));
 
         listener.onInventoryClick(click);
-
         verify(autoCollectService, never()).syncWaitList(player);
 
     }
@@ -156,4 +154,5 @@ class WaitListSyncListenerTest {
         }
 
     }
+
 }

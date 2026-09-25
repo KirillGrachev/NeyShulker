@@ -65,7 +65,6 @@ class MessageServiceTest {
     void disabledMessagesAreNotSent() {
 
         Player player = mock(Player.class);
-
         when(configManager.areMessagesEnabled()).thenReturn(false);
 
         messageService.send(player, MessageKey.RELOAD);
@@ -104,7 +103,6 @@ class MessageServiceTest {
         when(configManager.getMessages(MessageKey.USAGE)).thenReturn(List.of("{prefix}usage"));
 
         messageService.send(console, MessageKey.USAGE);
-
         verify(console).sendMessage("P usage");
 
     }
@@ -127,4 +125,5 @@ class MessageServiceTest {
         verify(player).sendMessage("§aClean");
 
     }
+
 }

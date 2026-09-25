@@ -44,7 +44,6 @@ public class ShulkerCleanupListener implements Listener {
         }
 
         ShulkerSession session = sessionRegistry.getSessionByInventory(event.getInventory());
-
         closeService.close(player, session);
 
     }
@@ -62,4 +61,5 @@ public class ShulkerCleanupListener implements Listener {
         autoCollectService.forget(player);
 
     }
+
 }

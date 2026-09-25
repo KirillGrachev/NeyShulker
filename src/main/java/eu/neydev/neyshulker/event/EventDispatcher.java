@@ -22,10 +22,9 @@ public class EventDispatcher {
      * @param listeners регистрируемые слушатели
      */
     public void registerEvents(Listener @NotNull ... listeners) {
-
         for (Listener listener : listeners) {
             Bukkit.getPluginManager().registerEvents(listener, plugin);
         }
-
     }
+
 }

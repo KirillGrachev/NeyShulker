@@ -128,4 +128,5 @@ public class PlayerInteractListener implements Listener {
                 || event.getAction() == Action.RIGHT_CLICK_BLOCK;
 
     }
+
 }

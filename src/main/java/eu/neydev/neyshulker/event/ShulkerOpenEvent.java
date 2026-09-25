@@ -61,4 +61,5 @@ public class ShulkerOpenEvent extends NeyShulkerEvent implements Cancellable {
     public static @NotNull HandlerList getHandlerList() {
         return HANDLERS;
     }
+
 }

@@ -14,7 +14,6 @@ import org.jetbrains.annotations.Nullable;
 public final class ItemStackTransaction {
 
     private ItemStackTransaction() {
-
     }
 
     /**
@@ -44,9 +43,7 @@ public final class ItemStackTransaction {
             newDestination.setAmount(Math.min(amount, newDestination.getMaxStackSize()));
 
             int moved = newDestination.getAmount();
-
             newSource.setAmount(source.getAmount() - moved);
-
             return new TransferResult(normalize(newSource), normalize(newDestination), moved);
 
         }
@@ -62,10 +59,9 @@ public final class ItemStackTransaction {
         }
 
         int moved = Math.min(space, amount);
-
         newDestination.setAmount(newDestination.getAmount() + moved);
-        newSource.setAmount(newSource.getAmount() - moved);
 
+        newSource.setAmount(newSource.getAmount() - moved);
         return new TransferResult(normalize(newSource), normalize(newDestination), moved);
 
     }
@@ -137,4 +133,5 @@ public final class ItemStackTransaction {
     private static @Nullable ItemStack clone(@Nullable ItemStack itemStack) {
         return itemStack == null ? null : itemStack.clone();
     }
+
 }

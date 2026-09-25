@@ -47,14 +47,13 @@ public enum OpenMethodType {
         }
 
         for (OpenMethodType method : values()) {
-
             if (method.name().equalsIgnoreCase(value.trim())) {
                 return method;
             }
-
         }
 
         return defaultType;
 
     }
+
 }

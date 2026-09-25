@@ -301,11 +301,9 @@ public final class CollectScan {
     private boolean holdsType(@NotNull ItemStack stack) {
 
         for (BoxCollectTarget target : boxes.values()) {
-
             if (amountOf(target, stack) > 0) {
                 return true;
             }
-
         }
 
         return false;
@@ -320,11 +318,9 @@ public final class CollectScan {
         int amount = 0;
 
         for (ItemStack slot : contentsOf(target)) {
-
             if (slot != null && slot.isSimilar(stack)) {
                 amount += slot.getAmount();
             }
-
         }
 
         return amount;
@@ -366,12 +362,10 @@ public final class CollectScan {
         boolean anyModified = false;
 
         for (BoxCollectTarget target : boxes.values()) {
-
             if (target.isModified()) {
                 target.flush();
                 anyModified = true;
             }
-
         }
 
         if (anyModified) {
@@ -379,7 +373,6 @@ public final class CollectScan {
         }
 
     }
-
 
     private void buildBoxes() {
 
@@ -431,4 +424,5 @@ public final class CollectScan {
     private ItemStack @NotNull [] contentsOf(@NotNull BoxCollectTarget target) {
         return target.workingContents();
     }
+
 }

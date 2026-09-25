@@ -26,9 +26,7 @@ class HexColorUtilTest {
     @Test
     @DisplayName("Обычные цветовые коды тоже обрабатываются")
     void convertsLegacyCodes() {
-
         assertEquals("§cText", HexColorUtil.color("&cText"));
-
     }
 
     @Test
@@ -57,9 +55,7 @@ class HexColorUtilTest {
     @Test
     @DisplayName("Неполный HEX-код не ломает строку")
     void ignoresInvalidHex() {
-
         assertEquals("§f#gggggg", HexColorUtil.color("&f#gggggg"));
-
     }
 
     @Test
@@ -80,4 +76,5 @@ class HexColorUtilTest {
         assertFalse(HexColorUtil.strip("&cText").contains("§"));
 
     }
+
 }

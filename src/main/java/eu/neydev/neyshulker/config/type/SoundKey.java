@@ -18,10 +18,12 @@ public enum SoundKey {
     private final float defaultPitch;
 
     SoundKey(String configKey, Sound defaultSound, float defaultVolume, float defaultPitch) {
+
         this.configKey = configKey;
         this.defaultSound = defaultSound;
         this.defaultVolume = defaultVolume;
         this.defaultPitch = defaultPitch;
+
     }
 
     public @NotNull String getConfigKey() {
@@ -39,4 +41,5 @@ public enum SoundKey {
     public float getDefaultPitch() {
         return defaultPitch;
     }
+
 }

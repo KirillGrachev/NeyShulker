@@ -37,4 +37,5 @@ public class ShulkerSyncListener implements Listener {
     public void onInventoryDrag(@NotNull InventoryDragEvent event) {
         transferService.markChanged(sessionRegistry.getSessionByInventory(event.getInventory()));
     }
+
 }

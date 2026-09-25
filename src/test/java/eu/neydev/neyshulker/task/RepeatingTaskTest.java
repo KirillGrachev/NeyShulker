@@ -43,7 +43,6 @@ class RepeatingTaskTest {
             });
 
             assertFalse(repeating.isRunning());
-
             repeating.start(20L, 20L);
 
             assertTrue(repeating.isRunning());
@@ -84,4 +83,5 @@ class RepeatingTaskTest {
         }
 
     }
+
 }

@@ -74,7 +74,6 @@ class AutoCollectWaveTest {
         ItemStack shulker = shulker(boxContents);
 
         inventory.setItem(0, shulker);
-
         when(inventory.getContents()).thenReturn(new ItemStack[]{shulker});
 
         Location playerLocation = mock(Location.class);
@@ -94,10 +93,12 @@ class AutoCollectWaveTest {
         when(player.getItemOnCursor()).thenReturn(null);
 
         for (Item drop : drops) {
+
             Location dropLocation = mock(Location.class);
 
             when(dropLocation.distanceSquared(playerLocation)).thenReturn(1.0D);
             when(drop.getLocation()).thenReturn(dropLocation);
+
         }
 
         return new Fixture(player, world, boxContents, playerId);
@@ -122,13 +123,11 @@ class AutoCollectWaveTest {
 
         });
         when(meta.getBlockState()).thenReturn(box);
-
         ItemStack shulker = mock(ItemStack.class);
 
         when(shulker.getType()).thenReturn(Material.WHITE_SHULKER_BOX);
         when(shulker.clone()).thenReturn(shulker);
         when(shulker.getItemMeta()).thenReturn(meta);
-
         return shulker;
 
     }
@@ -160,7 +159,6 @@ class AutoCollectWaveTest {
     private AutoCollectService service(int playersPerWave, int actionsPerWave, int queuePerPlayer) {
 
         NeyShulker plugin = mock(NeyShulker.class);
-
         when(plugin.getLogger()).thenReturn(java.util.logging.Logger.getLogger("wave-test"));
 
         when(configManager.isPluginEnabled()).thenReturn(true);
@@ -240,7 +238,6 @@ class AutoCollectWaveTest {
         Item second = drop(Material.DIAMOND, 2);
 
         Fixture fixture = fixture(first, second);
-
         AutoCollectService service = service(5, 3, 32);
 
         try (MockedStatic<Bukkit> ignored = bukkit(fixture)) {
@@ -256,9 +253,7 @@ class AutoCollectWaveTest {
             assertEquals(3, stored.getAmount());
 
             service.wave();
-
             verify(second).remove();
-
             ItemStack merged = fixture.boxContents().getItem(0);
 
             assertNotNull(merged);
@@ -276,7 +271,6 @@ class AutoCollectWaveTest {
         Item second = drop(Material.EMERALD, 2);
 
         Fixture fixture = fixture(first, second);
-
         AutoCollectService service = service(5, 64, 1);
 
         try (MockedStatic<Bukkit> ignored = bukkit(fixture)) {
@@ -331,7 +325,6 @@ class AutoCollectWaveTest {
         Fixture fixture = fixture(drop);
 
         fixture.boxContents().setItem(0, new FakeItemStack(Material.DIRT, 64));
-
         AutoCollectService service = service(5, 64, 32);
 
         // После хелпера: тот ставит дефолтный ALL, а последний stub выигрывает
@@ -349,4 +342,5 @@ class AutoCollectWaveTest {
         }
 
     }
+
 }

@@ -21,7 +21,6 @@ import static org.mockito.Mockito.when;
 public final class TestInventories {
 
     private TestInventories() {
-
     }
 
     /**
@@ -88,8 +87,8 @@ public final class TestInventories {
 
         when(view.getTopInventory()).thenReturn(top);
         when(view.getBottomInventory()).thenReturn(bottom);
-
         return view;
 
     }
+
 }

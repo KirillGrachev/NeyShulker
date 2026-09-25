@@ -42,13 +42,11 @@ public record SoundSettings(@NotNull Sound sound,
         Sound sound = defaultSound;
 
         if (name != null && !name.isBlank()) {
-
             try {
                 sound = Sound.valueOf(name.trim().toUpperCase(Locale.ROOT));
             } catch (IllegalArgumentException exception) {
                 onUnknownName.run();
             }
-
         }
 
         return new SoundSettings(sound, enabled, volume, pitch);

@@ -138,4 +138,5 @@ public class ShulkerTitleService {
         return names.get(DEFAULT_LOCALE_KEY);
 
     }
+
 }

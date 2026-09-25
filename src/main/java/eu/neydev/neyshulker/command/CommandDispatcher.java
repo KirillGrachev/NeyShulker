@@ -20,8 +20,10 @@ public class CommandDispatcher {
     private final ConsoleService consoleService;
 
     public CommandDispatcher(@NotNull NeyShulker plugin, @NotNull ConsoleService consoleService) {
+
         this.plugin = plugin;
         this.consoleService = consoleService;
+
     }
 
     /**
@@ -35,10 +37,8 @@ public class CommandDispatcher {
         PluginCommand pluginCommand = plugin.getCommand(command);
 
         if (pluginCommand == null) {
-
             consoleService.log(ConsoleMessage.COMMAND_MISSING, "command", command);
             return;
-
         }
 
         pluginCommand.setExecutor(executor);
@@ -71,12 +71,11 @@ public class CommandDispatcher {
             syncCommands();
 
         } catch (ReflectiveOperationException | RuntimeException exception) {
-
             consoleService.log(ConsoleMessage.COMMAND_UNREGISTER_FAILED,
                     "command", command,
                     "reason", String.valueOf(exception.getMessage()));
-
         }
+
     }
 
     /**
@@ -84,14 +83,12 @@ public class CommandDispatcher {
      * чтобы вырегистрованная команда исчезла и из автодополнения.
      */
     private void syncCommands() {
-
         try {
-
             Method syncCommands = Bukkit.getServer().getClass().getMethod("syncCommands");
             syncCommands.invoke(Bukkit.getServer());
-
         } catch (ReflectiveOperationException | RuntimeException ignored) {
             // сервер без syncCommands: команда исчезнет после рестарта
         }
     }
+
 }

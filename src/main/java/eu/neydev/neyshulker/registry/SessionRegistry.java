@@ -46,7 +46,6 @@ public class SessionRegistry {
                 shulkerItem, inventoryFactory, slot);
 
         sessions.put(playerId, session);
-
         return session;
 
     }
@@ -76,11 +75,9 @@ public class SessionRegistry {
         }
 
         for (ShulkerSession session : sessions.values()) {
-
             if (session.isInventory(inventory)) {
                 return session;
             }
-
         }
 
         return null;
@@ -102,4 +99,5 @@ public class SessionRegistry {
     public void clear() {
         sessions.clear();
     }
+
 }

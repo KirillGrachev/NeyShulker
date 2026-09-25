@@ -35,7 +35,6 @@ public final class PlayerWaitList {
         }
 
         entries.addLast(entry);
-
         return true;
 
     }
@@ -47,11 +46,9 @@ public final class PlayerWaitList {
      * @param entry элемент
      */
     public void offerFirst(@NotNull CollectEntry entry) {
-
         if (entries.size() < capacity) {
             entries.addFirst(entry);
         }
-
     }
 
     /**
@@ -67,9 +64,7 @@ public final class PlayerWaitList {
     public int removeIf(@NotNull Predicate<CollectEntry> filter) {
 
         int before = entries.size();
-
         entries.removeIf(filter);
-
         return before - entries.size();
 
     }
@@ -85,4 +80,5 @@ public final class PlayerWaitList {
     public int size() {
         return entries.size();
     }
+
 }

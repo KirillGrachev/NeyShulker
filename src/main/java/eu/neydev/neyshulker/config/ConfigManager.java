@@ -45,10 +45,7 @@ public class ConfigManager implements NeyShulkerConfig {
     private final List<Runnable> reloadListeners = new CopyOnWriteArrayList<>();
 
     private FileConfiguration config;
-
-
     private static final String PATH_ENABLED = "settings.enabled";
-
 
     private static final String PATH_OPEN_METHOD = "settings.shulker.open_method";
     private static final String PATH_TITLE = "settings.shulker.title";
@@ -59,7 +56,6 @@ public class ConfigManager implements NeyShulkerConfig {
     private static final String PATH_BLOCKED_ITEMS = "settings.shulker.blocked_items.items";
     private static final String PATH_LEGACY_BLACKLIST_ENABLED = "settings.shulker.blacklist.enabled";
     private static final String PATH_LEGACY_BLACKLIST_ITEMS = "settings.shulker.blacklist.items";
-
 
     private static final String PATH_AUTO_COLLECT_ENABLED = "settings.auto_collect.enabled";
     private static final String PATH_AUTO_COLLECT_DISTANCE = "settings.auto_collect.scan.distance";
@@ -80,17 +76,14 @@ public class ConfigManager implements NeyShulkerConfig {
     private static final String PATH_AUTO_COLLECT_IGNORED = "settings.auto_collect.ignored_items";
     private static final String PATH_LEGACY_AUTO_COLLECT_BLACKLIST = "settings.auto_collect.blacklist";
 
-
     private static final String PATH_MESSAGES_ENABLED = "messages.enabled";
     private static final String PATH_MESSAGE_PREFIX = "messages.prefix";
     private static final String PATH_PERMISSIONS_ENABLED = "permissions.enabled";
     private static final String PATH_PERMISSION_OP_BYPASS = "permissions.op_bypass";
 
-
     private static final int MIN_INTERVAL_TICKS = 1;
     private static final int MIN_COOLDOWN_SECONDS = 0;
     private static final double MIN_DISTANCE = 0.0D;
-
 
     private static final Set<Material> DEFAULT_BLACKLIST = EnumSet.of(
             Material.BEDROCK, Material.BARRIER, Material.COMMAND_BLOCK,
@@ -108,7 +101,6 @@ public class ConfigManager implements NeyShulkerConfig {
             Material.NETHERITE_INGOT, Material.NETHERITE_SCRAP, Material.ANCIENT_DEBRIS,
             Material.DIAMOND, Material.EMERALD, Material.GOLD_INGOT, Material.IRON_INGOT
     );
-
 
     private boolean pluginEnabled;
 
@@ -372,14 +364,15 @@ public class ConfigManager implements NeyShulkerConfig {
         return permissions.getOrDefault(node, node.getDefaultPermission());
     }
 
-
     private void saveDefaultConfig() {
         plugin.saveDefaultConfig();
     }
 
     private void loadConfig() {
+
         File configFile = new File(plugin.getDataFolder(), "config.yml");
         config = YamlConfiguration.loadConfiguration(configFile);
+
     }
 
     private void cacheConfigValues() {
@@ -482,7 +475,6 @@ public class ConfigManager implements NeyShulkerConfig {
 
     }
 
-
     /**
      * Читает глобальный режим автосбора; при некорректном значении - ALL.
      *
@@ -501,7 +493,6 @@ public class ConfigManager implements NeyShulkerConfig {
                 "path", PATH_AUTO_COLLECT_MODE,
                 "value", configValue,
                 "defaultValue", CollectMode.ALL.name());
-
         return CollectMode.ALL;
 
     }
@@ -525,7 +516,6 @@ public class ConfigManager implements NeyShulkerConfig {
                 "path", PATH_AUTO_COLLECT_FILL_ORDER,
                 "value", configValue,
                 "defaultValue", FillOrderType.BALANCED.name());
-
         return FillOrderType.BALANCED;
 
     }
@@ -580,8 +570,8 @@ public class ConfigManager implements NeyShulkerConfig {
             consoleService.log(ConsoleMessage.LEGACY_PATH,
                     "path", legacyPath,
                     "replacement", path);
-
             return config.getBoolean(legacyPath, defaultValue);
+
         }
 
         return defaultValue;
@@ -612,7 +602,6 @@ public class ConfigManager implements NeyShulkerConfig {
                 "path", PATH_TITLE_MODE,
                 "value", configValue,
                 "defaultValue", TitleMode.CUSTOM.name());
-
         return TitleMode.CUSTOM;
 
     }
@@ -656,7 +645,6 @@ public class ConfigManager implements NeyShulkerConfig {
                 "path", PATH_OPEN_METHOD,
                 "value", configValue,
                 "defaultValue", OpenMethodType.AIR.name());
-
         return OpenMethodType.AIR;
 
     }
@@ -695,7 +683,6 @@ public class ConfigManager implements NeyShulkerConfig {
                 "path", path,
                 "value", String.valueOf(value),
                 "defaultValue", String.valueOf(minimum));
-
         return minimum;
 
     }
@@ -710,7 +697,6 @@ public class ConfigManager implements NeyShulkerConfig {
                 "path", path,
                 "value", String.valueOf(value),
                 "defaultValue", String.valueOf(minimum));
-
         return minimum;
 
     }
@@ -745,7 +731,6 @@ public class ConfigManager implements NeyShulkerConfig {
         consoleService.log(ConsoleMessage.LEGACY_PATH,
                 "path", "messages.info_idle.text",
                 "replacement", "the same lines without the {queue} placeholder");
-
         return kept;
 
     }
@@ -763,11 +748,9 @@ public class ConfigManager implements NeyShulkerConfig {
             List<String> lines = new ArrayList<>(list.size());
 
             for (Object element : list) {
-
                 if (element != null) {
                     lines.add(color(String.valueOf(element)));
                 }
-
             }
 
             return Collections.unmodifiableList(lines);
@@ -849,11 +832,9 @@ public class ConfigManager implements NeyShulkerConfig {
         Material material = Material.matchMaterial(name.trim());
 
         if (material == null) {
-
             consoleService.log(ConsoleMessage.UNKNOWN_MATERIAL,
                     "path", path,
                     "value", name);
-
         }
 
         return material;
@@ -863,4 +844,5 @@ public class ConfigManager implements NeyShulkerConfig {
     private @NotNull String color(@Nullable String text) {
         return HexColorUtil.color(text);
     }
+
 }

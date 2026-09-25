@@ -21,4 +21,5 @@ public interface CollectTarget {
      * @return количество вставленных предметов
      */
     int insert(@NotNull ItemStack item);
+
 }

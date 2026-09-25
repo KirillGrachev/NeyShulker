@@ -30,4 +30,5 @@ public final class PlayerDropListener implements Listener {
     public void onDropItem(@NotNull PlayerDropItemEvent event) {
         plugin.getServices().getDropTracker().mark(event.getItemDrop());
     }
+
 }

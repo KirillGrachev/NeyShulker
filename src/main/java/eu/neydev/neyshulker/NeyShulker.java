@@ -47,9 +47,7 @@ public final class NeyShulker extends JavaPlugin {
         commandDispatcher.registerCommand(COMMAND_SHULKER, new ShulkerCommand(this));
 
         registerExpansion();
-
         services.getAutoCollectService().start();
-
         getLogger().info("NeyShulker started successfully.");
 
     }
@@ -98,11 +96,10 @@ public final class NeyShulker extends JavaPlugin {
     }
 
     private void unregisterExpansion() {
-
         if (expansion != null) {
             expansion.unregister();
             expansion = null;
         }
-
     }
+
 }

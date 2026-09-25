@@ -34,7 +34,6 @@ class CommandDispatcherTest {
         TabExecutor executor = mock(TabExecutor.class);
 
         when(plugin.getCommand("shulker")).thenReturn(command);
-
         dispatcher.registerCommand("shulker", executor);
 
         verify(command).setExecutor(executor);
@@ -47,11 +46,8 @@ class CommandDispatcherTest {
     void registerCommandLogsMissingCommand() {
 
         TabExecutor executor = mock(TabExecutor.class);
-
         when(plugin.getCommand("shulker")).thenReturn(null);
-
         dispatcher.registerCommand("shulker", executor);
-
         verify(consoleService).log(ConsoleMessage.COMMAND_MISSING, "command", "shulker");
 
     }
@@ -60,9 +56,7 @@ class CommandDispatcherTest {
     void unregisterCommandSilentlySkipsMissingCommand() {
 
         when(plugin.getCommand("shulker")).thenReturn(null);
-
         dispatcher.unregisterCommand("shulker");
-
         verifyNoInteractions(consoleService);
 
     }
@@ -71,9 +65,7 @@ class CommandDispatcherTest {
     void unregisterCommandLogsFailureWhenCommandMapUnavailable() {
 
         PluginCommand command = mock(PluginCommand.class);
-
         when(plugin.getCommand("shulker")).thenReturn(command);
-
         dispatcher.unregisterCommand("shulker");
 
         verify(consoleService).log(eq(ConsoleMessage.COMMAND_UNREGISTER_FAILED),
@@ -82,4 +74,5 @@ class CommandDispatcherTest {
         verify(command, never()).unregister(any());
 
     }
+
 }

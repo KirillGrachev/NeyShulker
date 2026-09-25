@@ -54,7 +54,6 @@ public record ShulkerSession(
                                                  @NotNull ItemStack shulkerItem,
                                                  @NotNull java.util.function.Supplier<Inventory> inventoryFactory,
                                                  int slot) {
-
         return new ShulkerSession(
                 sessionId,
                 player.getUniqueId(),
@@ -66,7 +65,6 @@ public record ShulkerSession(
                 new AtomicBoolean(false),
                 new AtomicBoolean(false)
         );
-
     }
 
     public int getSlot() {
@@ -111,4 +109,5 @@ public record ShulkerSession(
         return player != null && player.isOnline();
 
     }
+
 }

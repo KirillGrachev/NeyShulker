@@ -69,9 +69,11 @@ public final class CollectRules {
             if (other.getLocation().distanceSquared(at) <= radius * radius) {
                 return true;
             }
+
         }
 
         return false;
+
     }
 
     /**
@@ -85,6 +87,7 @@ public final class CollectRules {
 
         UUID owner = item.getOwner();
         return owner != null;
+
     }
 
     /**
@@ -156,14 +159,13 @@ public final class CollectRules {
         }
 
         for (ItemStack item : player.getInventory().getStorageContents()) {
-
             if (ShulkerUtil.isEmpty(item)) {
                 return true;
             }
-
         }
 
         return false;
 
     }
+
 }

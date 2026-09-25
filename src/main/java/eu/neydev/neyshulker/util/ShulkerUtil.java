@@ -28,7 +28,6 @@ public final class ShulkerUtil {
      * 0-35 хранение, 36-39 броня, 40 - вторая рука.
      */
     public static final int OFF_HAND_SLOT = 40;
-
     private static final Set<Material> SHULKER_BOXES = EnumSet.noneOf(Material.class);
 
     static {
@@ -54,7 +53,6 @@ public final class ShulkerUtil {
     }
 
     private ShulkerUtil() {
-
     }
 
     /**
@@ -150,7 +148,6 @@ public final class ShulkerUtil {
         boxInventory.clear();
 
         if (contents != null) {
-
             for (int i = 0; i < contents.length && i < SHULKER_SIZE; i++) {
 
                 ItemStack itemStack = contents[i];
@@ -160,12 +157,11 @@ public final class ShulkerUtil {
                 }
 
             }
-
         }
 
         blockStateMeta.setBlockState(box);
-        result.setItemMeta(blockStateMeta);
 
+        result.setItemMeta(blockStateMeta);
         return result;
 
     }
@@ -302,4 +298,5 @@ public final class ShulkerUtil {
         return null;
 
     }
+
 }

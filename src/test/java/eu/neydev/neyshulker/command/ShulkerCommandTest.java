@@ -74,7 +74,6 @@ class ShulkerCommandTest {
         when(plugin.getConfigManager()).thenReturn(configManager);
 
         when(player.getInventory()).thenReturn(inventory);
-
         return new ShulkerCommand(plugin);
 
     }
@@ -84,7 +83,6 @@ class ShulkerCommandTest {
     void noArgsPrintsUsage() {
 
         commandExecutor().onCommand(player, command, "shulker", new String[0]);
-
         verify(messageService).send((org.bukkit.command.CommandSender) player, MessageKey.USAGE, java.util.Map.of());
 
     }
@@ -136,7 +134,6 @@ class ShulkerCommandTest {
         when(player.getInventory().getHeldItemSlot()).thenReturn(0);
 
         commandExecutor().onCommand(player, command, "shulker", new String[]{"open"});
-
         verify(openService).open(player, shulker, 0);
 
     }
@@ -153,7 +150,6 @@ class ShulkerCommandTest {
         when(player.getInventory().getHeldItemSlot()).thenReturn(0);
 
         commandExecutor().onCommand(player, command, "shulker", new String[]{"open"});
-
         verify(openService).open(player, offhand, 40);
 
     }
@@ -166,7 +162,6 @@ class ShulkerCommandTest {
         when(autoCollectService.toggle(player)).thenReturn(false);
 
         commandExecutor().onCommand(player, command, "shulker", new String[]{"autocollect"});
-
         verify(messageService).send(player, MessageKey.AUTO_COLLECT_OFF);
 
     }
@@ -180,7 +175,6 @@ class ShulkerCommandTest {
         when(autoCollectService.isEnabledFor(player)).thenReturn(true);
 
         commandExecutor().onCommand(player, command, "shulker", new String[]{"info"});
-
         ArgumentCaptor<Map<String, String>> placeholders = ArgumentCaptor.forClass(Map.class);
 
         verify(messageService).send(eq(player), eq(MessageKey.INFO_IDLE), placeholders.capture());
@@ -202,9 +196,7 @@ class ShulkerCommandTest {
                 () -> TestInventories.inventory(27), 3);
 
         when(sessionRegistry.getSession(player)).thenReturn(session);
-
         commandExecutor().onCommand(player, command, "shulker", new String[]{"info"});
-
         verify(messageService).send(eq(player), eq(MessageKey.INFO_SESSION), anyMap());
 
     }
@@ -214,13 +206,12 @@ class ShulkerCommandTest {
     void tabCompletesSubcommands() {
 
         List<String> all = commandExecutor().onTabComplete(player, command, "shulker", new String[]{""});
-
         assertEquals(List.of("reload", "open", "info", "autocollect"), all);
-
         List<String> filtered = commandExecutor().onTabComplete(player, command, "shulker", new String[]{"au"});
 
         assertTrue(filtered.contains("autocollect"));
         assertEquals(1, filtered.size());
 
     }
+
 }

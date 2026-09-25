@@ -253,7 +253,6 @@ class ShulkerValidationServiceTest {
     void noSessionNoBlock() {
 
         when(sessionRegistry.getSession(player)).thenReturn(null);
-
         assertFalse(validationService.isHeldOpenShulker(player));
 
     }
@@ -291,7 +290,6 @@ class ShulkerValidationServiceTest {
     void droppedShulkerWithoutSessionIsNotOpen() {
 
         when(sessionRegistry.getSession(player)).thenReturn(null);
-
         assertFalse(validationService.isDroppedOpenShulker(player, shulker()));
 
     }
@@ -307,8 +305,10 @@ class ShulkerValidationServiceTest {
 
         assertTrue(validationService.isShulkerSlot(session, 7));
         assertFalse(validationService.isShulkerSlot(session, 6));
+
         assertFalse(validationService.isShulkerSlot(session, -1));
         assertFalse(validationService.isShulkerSlot(null, 7));
 
     }
+
 }

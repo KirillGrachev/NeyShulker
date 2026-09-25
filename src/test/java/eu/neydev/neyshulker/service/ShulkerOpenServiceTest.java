@@ -50,9 +50,7 @@ class ShulkerOpenServiceTest {
     private static Player player() {
 
         Player player = mock(Player.class);
-
         when(player.getUniqueId()).thenReturn(java.util.UUID.randomUUID());
-
         return player;
 
     }
@@ -74,17 +72,14 @@ class ShulkerOpenServiceTest {
         when(shulker.getType()).thenReturn(Material.WHITE_SHULKER_BOX);
         when(shulker.clone()).thenReturn(shulker);
         when(shulker.getItemMeta()).thenReturn(meta);
-
         return shulker;
 
     }
 
     private ShulkerOpenService openService(NeyShulker plugin) {
-
         return new ShulkerOpenService(plugin, sessionRegistry, new ShulkerContentService(),
                 new ShulkerTitleService(configManager), persistenceService,
                 messageService, soundService);
-
     }
 
     private NeyShulker pluginWithEvents() {
@@ -96,7 +91,6 @@ class ShulkerOpenServiceTest {
         when(server.getPluginManager()).thenReturn(pluginManager);
         when(plugin.getServer()).thenReturn(server);
         when(plugin.getLogger()).thenReturn(java.util.logging.Logger.getLogger("open-test"));
-
         return plugin;
 
     }
@@ -184,4 +178,5 @@ class ShulkerOpenServiceTest {
         }
 
     }
+
 }

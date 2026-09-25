@@ -53,4 +53,5 @@ public final class SessionCollectTarget implements CollectTarget {
     public @NotNull ShulkerSession getSession() {
         return session;
     }
+
 }

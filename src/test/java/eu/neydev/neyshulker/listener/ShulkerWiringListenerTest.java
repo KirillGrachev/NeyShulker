@@ -50,9 +50,7 @@ class ShulkerWiringListenerTest {
     private ShulkerSession session() {
 
         ItemStack shulker = mock(ItemStack.class);
-
         when(shulker.clone()).thenReturn(shulker);
-
         return ShulkerSession.create(UUID.randomUUID(), player, shulker, () -> gui, 2);
 
     }
@@ -67,7 +65,6 @@ class ShulkerWiringListenerTest {
         when(container.getCloseService()).thenReturn(closeService);
         when(container.getAutoCollectService()).thenReturn(autoCollectService);
         when(plugin.getServices()).thenReturn(container);
-
         return plugin;
 
     }
@@ -77,7 +74,6 @@ class ShulkerWiringListenerTest {
     void syncListenerMarksSession() {
 
         when(sessionRegistry.getSessionByInventory(gui)).thenReturn(session);
-
         ShulkerSyncListener listener = new ShulkerSyncListener(plugin());
 
         InventoryClickEvent click = mock(InventoryClickEvent.class);
@@ -98,14 +94,12 @@ class ShulkerWiringListenerTest {
     void syncListenerIgnoresForeignInventories() {
 
         Inventory chest = TestInventories.inventory(27);
-
         ShulkerSyncListener listener = new ShulkerSyncListener(plugin());
 
         InventoryClickEvent click = mock(InventoryClickEvent.class);
         when(click.getInventory()).thenReturn(chest);
 
         listener.onInventoryClick(click);
-
         verify(transferService, never()).markChanged(session);
 
     }
@@ -129,24 +123,20 @@ class ShulkerWiringListenerTest {
         when(sessionRegistry.getSessionByInventory(gui)).thenReturn(session);
 
         ShulkerCleanupListener listener = new ShulkerCleanupListener(plugin());
-
         InventoryCloseEvent close = mock(InventoryCloseEvent.class);
 
         when(close.getInventory()).thenReturn(gui);
         when(close.getPlayer()).thenReturn(player);
 
         listener.onInventoryClose(close);
-
         verify(closeService).close(player, session);
-
         PlayerQuitEvent quit = mock(PlayerQuitEvent.class);
-
         when(quit.getPlayer()).thenReturn(player);
-
         listener.onPlayerQuit(quit);
 
         verify(closeService).close(player);
         verify(autoCollectService).forget(player);
 
     }
+
 }

@@ -75,7 +75,6 @@ class ShulkerGuardListenerTest {
         when(configManager.getMessages(any())).thenReturn(List.of("blocked"));
         when(player.getInventory()).thenReturn(bottom);
         when(player.isOnline()).thenReturn(true);
-
         return new ShulkerGuardListener(plugin);
 
     }
@@ -94,7 +93,6 @@ class ShulkerGuardListenerTest {
         when(event.getCursor()).thenReturn(null);
         when(event.getCurrentItem()).thenReturn(null);
         when(event.isShiftClick()).thenReturn(false);
-
         return event;
 
     }
@@ -114,9 +112,7 @@ class ShulkerGuardListenerTest {
         when(sessionRegistry.getSessionByInventory(gui)).thenReturn(session);
 
         InventoryClickEvent event = click(5, 4, ClickType.NUMBER_KEY);
-
         listener().onInventoryClick(event);
-
         verify(event).setCancelled(true);
 
     }
@@ -129,9 +125,7 @@ class ShulkerGuardListenerTest {
         when(sessionRegistry.getSessionByInventory(gui)).thenReturn(session);
 
         InventoryClickEvent event = click(5, 7, ClickType.NUMBER_KEY);
-
         listener().onInventoryClick(event);
-
         verify(event, never()).setCancelled(true);
 
     }
@@ -151,7 +145,6 @@ class ShulkerGuardListenerTest {
         when(event.getCurrentItem()).thenReturn(otherShulker);
 
         listener().onInventoryClick(event);
-
         verify(event).setCancelled(true);
 
     }
@@ -169,7 +162,6 @@ class ShulkerGuardListenerTest {
                 new eu.neydev.neyshulker.util.FakeItemStack(org.bukkit.Material.DIAMOND, 3));
 
         listener().onInventoryClick(event);
-
         verify(event, never()).setCancelled(true);
 
     }
@@ -189,7 +181,6 @@ class ShulkerGuardListenerTest {
         InventoryClickEvent event = click(5, 7, ClickType.NUMBER_KEY);
 
         listener().onInventoryClick(event);
-
         verify(event).setCancelled(true);
 
     }
@@ -202,9 +193,7 @@ class ShulkerGuardListenerTest {
         when(sessionRegistry.getSessionByInventory(gui)).thenReturn(session);
 
         InventoryClickEvent event = click(27 + 4, 9, ClickType.LEFT);
-
         listener().onInventoryClick(event);
-
         verify(event).setCancelled(true);
 
     }
@@ -217,7 +206,6 @@ class ShulkerGuardListenerTest {
         when(event.getPlayer()).thenReturn(player);
         when(event.getItemDrop()).thenReturn(item);
         when(item.getItemStack()).thenReturn(stack);
-
         return event;
 
     }
@@ -237,9 +225,7 @@ class ShulkerGuardListenerTest {
     void dropOfGuiContentPasses() {
 
         openSession(4);
-
         PlayerDropItemEvent event = drop(new FakeItemStack(Material.STONE, 2));
-
         listener().onPlayerDropItem(event);
 
         verify(event, never()).setCancelled(true);
@@ -255,7 +241,6 @@ class ShulkerGuardListenerTest {
         bottom.setItem(4, new FakeItemStack(Material.WHITE_SHULKER_BOX, 1));
 
         PlayerDropItemEvent event = drop(new FakeItemStack(Material.BLACK_SHULKER_BOX, 1));
-
         listener().onPlayerDropItem(event);
 
         verify(event, never()).setCancelled(true);
@@ -278,7 +263,6 @@ class ShulkerGuardListenerTest {
         listener.onInventoryClick(click(3, 9, ClickType.DROP));
 
         PlayerDropItemEvent event = drop(twin.clone());
-
         listener.onPlayerDropItem(event);
 
         verify(event, never()).setCancelled(true);
@@ -296,11 +280,8 @@ class ShulkerGuardListenerTest {
         bottom.setItem(4, box);
 
         ShulkerGuardListener listener = listener();
-
         listener.onInventoryClick(click(27 + 4, 9, ClickType.DROP));
-
         PlayerDropItemEvent event = drop(box.clone());
-
         listener.onPlayerDropItem(event);
 
         verify(event).setCancelled(true);
@@ -319,7 +300,6 @@ class ShulkerGuardListenerTest {
         bottom.setItem(4, box);
 
         PlayerDropItemEvent event = drop(box.clone());
-
         listener().onPlayerDropItem(event);
 
         verify(event).setCancelled(true);
@@ -332,13 +312,12 @@ class ShulkerGuardListenerTest {
     void dropOfClosedShulkerPasses() {
 
         when(sessionRegistry.hasSession(player.getUniqueId())).thenReturn(false);
-
         PlayerDropItemEvent event = drop(new FakeItemStack(Material.WHITE_SHULKER_BOX, 1));
-
         listener().onPlayerDropItem(event);
 
         verify(event, never()).setCancelled(true);
         verify(player, never()).sendMessage(anyString());
 
     }
+
 }

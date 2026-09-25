@@ -38,14 +38,13 @@ public enum FillOrderType {
         }
 
         for (FillOrderType order : values()) {
-
             if (order.name().equalsIgnoreCase(value.trim())) {
                 return order;
             }
-
         }
 
         return defaultOrder;
 
     }
+
 }

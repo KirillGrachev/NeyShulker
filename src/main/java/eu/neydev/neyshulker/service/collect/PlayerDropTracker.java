@@ -47,6 +47,7 @@ public final class PlayerDropTracker {
 
         Long deadline = deadlines.get(item.getUniqueId());
         return deadline != null && clock.getAsLong() < deadline;
+
     }
 
     /**
@@ -62,6 +63,7 @@ public final class PlayerDropTracker {
                 iterator.remove();
             }
         }
+
     }
 
     /**
@@ -70,4 +72,5 @@ public final class PlayerDropTracker {
     public void clear() {
         deadlines.clear();
     }
+
 }

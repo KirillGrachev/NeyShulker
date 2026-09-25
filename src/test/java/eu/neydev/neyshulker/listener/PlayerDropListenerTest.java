@@ -28,8 +28,8 @@ class PlayerDropListenerTest {
 
         when(plugin.getServices()).thenReturn(services);
         when(services.getDropTracker()).thenReturn(tracker);
-
         return new PlayerDropListener(plugin);
+
     }
 
     @Test
@@ -37,15 +37,12 @@ class PlayerDropListenerTest {
     void thrownDropIsMarked() {
 
         Item drop = mock(Item.class);
-
         when(drop.getUniqueId()).thenReturn(UUID.randomUUID());
-
         PlayerDropItemEvent event = mock(PlayerDropItemEvent.class);
-
         when(event.getItemDrop()).thenReturn(drop);
-
         listener.onDropItem(event);
-
         assertTrue(tracker.isPlayerDropped(drop));
+
     }
+
 }

@@ -32,9 +32,11 @@ public enum ConsoleMessage {
     private final String defaultTemplate;
 
     ConsoleMessage(String configKey, boolean defaultEnabled, String defaultTemplate) {
+
         this.configKey = configKey;
         this.defaultEnabled = defaultEnabled;
         this.defaultTemplate = defaultTemplate;
+
     }
 
     public @NotNull String getConfigKey() {
@@ -48,4 +50,5 @@ public enum ConsoleMessage {
     public @NotNull String getDefaultTemplate() {
         return defaultTemplate;
     }
+
 }

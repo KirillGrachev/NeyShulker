@@ -42,7 +42,6 @@ public class ShulkerGuardListener implements Listener {
      * приходит следом за кликом на том же тике, большего окна не нужно.
      */
     private static final long DROP_MARKER_WINDOW_MILLIS = 250L;
-
     private final Map<UUID, Long> allowedDrops = new ConcurrentHashMap<>();
 
     private final SessionRegistry sessionRegistry;
@@ -77,8 +76,10 @@ public class ShulkerGuardListener implements Listener {
         //     который не равен rawSlot и без этой проверки уходил бы в обход
         if (event.getClick() == ClickType.NUMBER_KEY
                 && validationService.isShulkerSlot(session, event.getHotbarButton())) {
+
             cancel(event, player, MessageKey.MOVE_BLOCKED);
             return;
+
         }
 
         // Shift-клик тянет предмет из нижней клетки в GUI ванильным путем:
@@ -119,6 +120,7 @@ public class ShulkerGuardListener implements Listener {
         }
 
         // 3. Беремый предмет не может быть шалкер-боксом или запрещенным
+
         if (clickInShulker && isDisallowed(player, event.getCurrentItem())) {
             cancel(event, player, validationService.canEnterShulker(player, event.getCurrentItem()));
             return;
@@ -139,12 +141,10 @@ public class ShulkerGuardListener implements Listener {
 
         // Перетаскивание по слоту с открытым шалкер-боксом запрещено
         for (Integer rawSlot : event.getRawSlots()) {
-
             if (rawSlot != null && isShulkerSlot(player, rawSlot, session)) {
                 cancel(event, player, MessageKey.SELF_REMOVE);
                 return;
             }
-
         }
 
         if (isDisallowed(player, event.getCursor())) {
@@ -153,12 +153,10 @@ public class ShulkerGuardListener implements Listener {
         }
 
         for (ItemStack item : event.getNewItems().values()) {
-
             if (isDisallowed(player, item)) {
                 cancel(event, player, validationService.canEnterShulker(player, item));
                 return;
             }
-
         }
 
     }
@@ -266,19 +264,14 @@ public class ShulkerGuardListener implements Listener {
      */
     private @Nullable ItemStack enteringItem(@NotNull Player player,
                                              @NotNull InventoryClickEvent event) {
-
         return switch (event.getClick()) {
-
             case NUMBER_KEY -> event.getHotbarButton() >= 0
                     ? player.getInventory().getItem(event.getHotbarButton())
                     : null;
 
             case SWAP_OFFHAND -> player.getInventory().getItemInOffHand();
-
             default -> event.getCursor();
-
         };
-
     }
 
     private boolean isDisallowed(@NotNull Player player, ItemStack item) {
@@ -316,6 +309,7 @@ public class ShulkerGuardListener implements Listener {
     }
 
     private void cancel(@NotNull InventoryDragEvent event,
+
                         @NotNull Player player,
                         @NotNull ValidationResult result) {
 
@@ -326,4 +320,5 @@ public class ShulkerGuardListener implements Listener {
         }
 
     }
+
 }

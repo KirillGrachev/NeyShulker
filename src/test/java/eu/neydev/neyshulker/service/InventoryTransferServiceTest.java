@@ -40,13 +40,12 @@ class InventoryTransferServiceTest {
     void insertIntoFullInventory() {
 
         Inventory destination = TestInventories.inventory(1);
-
         destination.setItem(0, new FakeItemStack(Material.DIAMOND, 64));
-
         int inserted = transferService.insert(null, destination, new FakeItemStack(Material.DIAMOND, 5));
 
         assertEquals(0, inserted);
         assertEquals(64, destination.getItem(0).getAmount());
 
     }
+
 }

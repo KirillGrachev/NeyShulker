@@ -91,4 +91,5 @@ class ViewSlotUtilTest {
         assertFalse(ViewSlotUtil.isViewing(player, null));
 
     }
+
 }

@@ -53,7 +53,6 @@ class CollectScanTargetTest {
 
         when(inventory.getContents()).thenReturn(contents);
         when(player.getInventory()).thenReturn(inventory);
-
         return new CollectScan(player, null, configManager, transferService, persistenceService);
 
     }
@@ -62,9 +61,11 @@ class CollectScanTargetTest {
      * Дефолтные политики скана: режим ALL, merge включен, стратегия BALANCED.
      */
     private void defaultRules() {
+
         when(configManager.getAutoCollectMode()).thenReturn(CollectMode.ALL);
         when(configManager.isAutoCollectMergeIntoExisting()).thenReturn(true);
         when(configManager.getAutoCollectFillOrder()).thenReturn(FillOrderType.BALANCED);
+
     }
 
     /**
@@ -106,7 +107,6 @@ class CollectScanTargetTest {
         when(shulker.getAmount()).thenReturn(slot);
         when(shulker.clone()).thenReturn(shulker);
         when(shulker.getItemMeta()).thenReturn(meta);
-
         return shulker;
 
     }
@@ -176,7 +176,6 @@ class CollectScanTargetTest {
     void tiesBreakBySlotOrder() {
 
         defaultRules();
-
         CollectScan scan = scan(box(3), box(7));
 
         assertEquals(3, targetSlot(scan, Material.GOLD_INGOT),
@@ -223,7 +222,6 @@ class CollectScanTargetTest {
     void hasSpaceForSeesPhysicalSpace() {
 
         defaultRules();
-
         CollectScan full = scan(box(0, partials(27)));
 
         assertFalse(full.hasSpaceFor(new FakeItemStack(Material.DIAMOND, 1)),
@@ -232,7 +230,6 @@ class CollectScanTargetTest {
                 "Частичный стек того же типа поглощает дроп и без свободного слота");
 
         CollectScan matching = scan(box(0, new FakeItemStack(Material.DIRT, 64)));
-
         when(configManager.getAutoCollectMode()).thenReturn(CollectMode.MATCHING);
 
         assertNull(matching.targetFor(new FakeItemStack(Material.GOLD_INGOT, 1)));
@@ -271,7 +268,6 @@ class CollectScanTargetTest {
     void sessionSpaceGate() {
 
         defaultRules();
-
         Inventory session = TestInventories.inventory(ShulkerUtil.SHULKER_SIZE);
 
         for (int i = 0; i < ShulkerUtil.SHULKER_SIZE; i++) {
@@ -311,7 +307,6 @@ class CollectScanTargetTest {
                 new FakeItemStack(Material.WHITE_SHULKER_BOX, 1), sessionInventory,
                 System.currentTimeMillis(), new AtomicInteger(0),
                 new AtomicBoolean(), new AtomicBoolean(), new AtomicBoolean());
-
         return new CollectScan(player, session, configManager, transferService, persistenceService);
 
     }
@@ -319,7 +314,6 @@ class CollectScanTargetTest {
     private ItemStack dense(int slot, int stoneStacks) {
 
         ItemStack[] contents = new ItemStack[stoneStacks + 1];
-
         contents[0] = new FakeItemStack(Material.DIRT, 1);
 
         for (int i = 1; i <= stoneStacks; i++) {
@@ -341,4 +335,5 @@ class CollectScanTargetTest {
         return contents;
 
     }
+
 }
