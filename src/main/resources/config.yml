@@ -139,6 +139,16 @@ messages:
   enabled: true # Master switch for all plugin messages
   prefix: "&#b388ffNeyShulker &8» &7" # Substituted into {prefix} inside the texts (empty = no prefix)
 
+  # Word-fragments for the {state} placeholder inside info_idle (not standalone
+  # messages): /shulker info assembles the line "Auto-collect: <state_on|state_off>"
+  state_on:
+    enabled: true
+    text: "&aenabled"
+
+  state_off:
+    enabled: true
+    text: "&cdisabled"
+
   no_permission:
     enabled: true
     text: "{prefix}&#ff6b6bYou do not have permission to do this."
@@ -210,14 +220,6 @@ messages:
       - "&dFree slots: &f{free}&7/&f{size}"
       - "&dItems inside: &f{items}"
       - "&dOpen for: &f{seconds}&7 s."
-
-  state_on:
-    enabled: true
-    text: "&aenabled"
-
-  state_off:
-    enabled: true
-    text: "&cdisabled"
 
   auto_collect:
     enabled: false # Report what was collected into the chat (useful while testing)
