@@ -113,6 +113,7 @@ public final class SessionTagger {
         meta.getPersistentDataContainer()
                 .set(SESSION_KEY, PersistentDataType.STRING, sessionId.toString());
         copy.setItemMeta(meta);
+
         return copy;
 
     }
@@ -143,18 +144,17 @@ public final class SessionTagger {
 
         meta.getPersistentDataContainer().remove(SESSION_KEY);
         copy.setItemMeta(meta);
+
         return copy;
 
     }
 
     private static @Nullable ItemMeta metaOf(@NotNull ItemStack item) {
-
         try {
             return item.getItemMeta();
         } catch (RuntimeException exception) {
             return null;
         }
-
     }
 
 }

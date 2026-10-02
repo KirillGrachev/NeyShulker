@@ -44,10 +44,8 @@ public final class PlayerDropTracker {
      * @return true, если предмет выброшен игроком
      */
     public boolean isPlayerDropped(@NotNull Item item) {
-
         Long deadline = deadlines.get(item.getUniqueId());
         return deadline != null && clock.getAsLong() < deadline;
-
     }
 
     /**

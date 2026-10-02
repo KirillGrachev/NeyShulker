@@ -40,10 +40,8 @@ class NeyShulkerIntegrationTest {
 
     @BeforeEach
     void setUp() {
-
         server = MockBukkit.mock();
         plugin = MockBukkit.load(NeyShulker.class);
-
     }
 
     @AfterEach
@@ -98,6 +96,7 @@ class NeyShulkerIntegrationTest {
         assertEquals(0, session.getSlot());
         assertSame(session.inventory(), player.getOpenInventory().getTopInventory(),
                 "Игрок смотрит в GUI сессии");
+
         assertTrue(player.getOpenInventory().getTopInventory().getHolder()
                 instanceof eu.neydev.neyshulker.inventory.NeyShulkerViewer,
                 "Держатель GUI - маркер плагина");
@@ -158,9 +157,7 @@ class NeyShulkerIntegrationTest {
 
     /** info многострочен: опустошаем очередь, чтобы следующие проверки не читали хвост. */
     private void drainMessages(PlayerMock player) {
-        while (player.nextMessage() != null) {
-            // noop
-        }
+        while (player.nextMessage() != null) {}
     }
 
     @Test

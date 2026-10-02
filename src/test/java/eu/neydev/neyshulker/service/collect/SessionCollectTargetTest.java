@@ -36,6 +36,7 @@ class SessionCollectTargetTest {
 
         when(owner.getUniqueId()).thenReturn(UUID.randomUUID());
         when(shulker.clone()).thenReturn(shulker);
+
         return ShulkerSession.create(UUID.randomUUID(), owner, shulker, () -> gui, 2);
 
     }

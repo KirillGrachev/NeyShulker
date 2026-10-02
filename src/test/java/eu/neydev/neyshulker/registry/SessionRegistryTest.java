@@ -29,6 +29,7 @@ class SessionRegistryTest {
 
         Player player = mock(Player.class);
         when(player.getUniqueId()).thenReturn(UUID.randomUUID());
+
         return player;
 
     }
@@ -37,6 +38,7 @@ class SessionRegistryTest {
 
         ItemStack shulker = mock(ItemStack.class);
         when(shulker.clone()).thenReturn(shulker);
+
         return shulker;
 
     }

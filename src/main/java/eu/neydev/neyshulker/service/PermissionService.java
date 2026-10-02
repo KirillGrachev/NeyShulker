@@ -64,11 +64,9 @@ public class PermissionService {
      * @return true если проверки прав для него не действуют
      */
     private boolean isOpBypass(@Nullable CommandSender sender) {
-
         return config.isPermissionOpBypass()
                 && sender != null
                 && (sender.isOp() || sender instanceof ConsoleCommandSender);
-
     }
 
     /**

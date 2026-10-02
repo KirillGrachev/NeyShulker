@@ -87,11 +87,9 @@ public enum MessageKey {
     private final String defaultMessage;
 
     MessageKey(String configKey, boolean defaultEnabled, String defaultMessage) {
-
         this.configKey = configKey;
         this.defaultEnabled = defaultEnabled;
         this.defaultMessage = defaultMessage;
-
     }
 
     public @NotNull String getConfigKey() {

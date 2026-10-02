@@ -80,9 +80,7 @@ public class SessionRegistry {
                                                   @NotNull ItemStack shulkerItem,
                                                   int slot,
                                                   @NotNull Supplier<Inventory> inventoryFactory) {
-
         return createSession(UUID.randomUUID(), player, shulkerItem, slot, inventoryFactory);
-
     }
 
     public @Nullable ShulkerSession getSession(@NotNull UUID playerId) {

@@ -135,10 +135,8 @@ class AutoCollectServiceTest {
         PluginManager pluginManager = mock(PluginManager.class);
 
         try (MockedStatic<Bukkit> bukkit = mockStatic(Bukkit.class)) {
-
             bukkit.when(Bukkit::getPluginManager).thenReturn(pluginManager);
             service.collectAround(player);
-
         }
 
         verify(drop).remove();
@@ -160,10 +158,8 @@ class AutoCollectServiceTest {
         PluginManager pluginManager = mock(PluginManager.class);
 
         try (MockedStatic<Bukkit> bukkit = mockStatic(Bukkit.class)) {
-
             bukkit.when(Bukkit::getPluginManager).thenReturn(pluginManager);
             service.collectAround(player);
-
         }
 
         verify(drop).remove();
@@ -185,6 +181,7 @@ class AutoCollectServiceTest {
         when(shulker.getType()).thenReturn(Material.WHITE_SHULKER_BOX);
         when(shulker.clone()).thenReturn(shulker);
         when(shulker.getItemMeta()).thenReturn(meta);
+
         return shulker;
 
     }
@@ -264,10 +261,8 @@ class AutoCollectServiceTest {
         when(server.getPluginManager()).thenReturn(pluginManager);
 
         try (MockedStatic<Bukkit> bukkit = mockStatic(Bukkit.class)) {
-
             bukkit.when(Bukkit::getPluginManager).thenReturn(pluginManager);
             service().collectAround(player);
-
         }
 
         verify(drop).remove();
@@ -318,6 +313,7 @@ class AutoCollectServiceTest {
         when(second.getOwner()).thenReturn(null);
         when(second.getLocation()).thenReturn(dropLocation);
         when(second.getItemStack()).thenReturn(new FakeItemStack(Material.DIAMOND, 2));
+
         return second;
 
     }
@@ -345,10 +341,8 @@ class AutoCollectServiceTest {
         PluginManager pluginManager = mock(PluginManager.class);
 
         try (MockedStatic<Bukkit> bukkit = mockStatic(Bukkit.class)) {
-
             bukkit.when(Bukkit::getPluginManager).thenReturn(pluginManager);
             service.collectAround(player);
-
         }
 
         verify(drop).remove();
@@ -401,10 +395,8 @@ class AutoCollectServiceTest {
         PluginManager pluginManager = mock(PluginManager.class);
 
         try (MockedStatic<Bukkit> bukkit = mockStatic(Bukkit.class)) {
-
             bukkit.when(Bukkit::getPluginManager).thenReturn(pluginManager);
             service.collectAround(player);
-
         }
 
         verify(drop).remove();
@@ -466,10 +458,8 @@ class AutoCollectServiceTest {
         PluginManager pluginManager = mock(PluginManager.class);
 
         try (MockedStatic<Bukkit> bukkit = mockStatic(Bukkit.class)) {
-
             bukkit.when(Bukkit::getPluginManager).thenReturn(pluginManager);
             service.collectAround(player);
-
         }
 
         verify(drop).remove();
@@ -490,10 +480,8 @@ class AutoCollectServiceTest {
         when(server.getPluginManager()).thenReturn(pluginManager);
 
         try (MockedStatic<Bukkit> bukkit = mockStatic(Bukkit.class)) {
-
             bukkit.when(Bukkit::getPluginManager).thenReturn(pluginManager);
             service().collectAround(player);
-
         }
 
         verify(drop, never()).remove();
@@ -638,10 +626,8 @@ class AutoCollectServiceTest {
         PluginManager pluginManager = mock(PluginManager.class);
 
         try (MockedStatic<Bukkit> bukkit = mockStatic(Bukkit.class)) {
-
             bukkit.when(Bukkit::getPluginManager).thenReturn(pluginManager);
             service.collectAround(player);
-
         }
 
         assertEquals(null, playerInventory.getItem(9),
@@ -672,10 +658,8 @@ class AutoCollectServiceTest {
         PluginManager pluginManager = mock(PluginManager.class);
 
         try (MockedStatic<Bukkit> bukkit = mockStatic(Bukkit.class)) {
-
             bukkit.when(Bukkit::getPluginManager).thenReturn(pluginManager);
             service.collectAround(player);
-
         }
 
         assertEquals(null, playerInventory.getItem(6));
@@ -704,10 +688,8 @@ class AutoCollectServiceTest {
         PluginManager pluginManager = mock(PluginManager.class);
 
         try (MockedStatic<Bukkit> bukkit = mockStatic(Bukkit.class)) {
-
             bukkit.when(Bukkit::getPluginManager).thenReturn(pluginManager);
             service.collectAround(player);
-
         }
 
         verify(drop, never()).remove();
@@ -821,10 +803,8 @@ class AutoCollectServiceTest {
         PluginManager pluginManager = mock(PluginManager.class);
 
         try (MockedStatic<Bukkit> bukkit = mockStatic(Bukkit.class)) {
-
             bukkit.when(Bukkit::getPluginManager).thenReturn(pluginManager);
             service().collectAround(player);
-
         }
 
         verify(drop).remove();
@@ -852,10 +832,8 @@ class AutoCollectServiceTest {
         PluginManager pluginManager = mock(PluginManager.class);
 
         try (MockedStatic<Bukkit> bukkit = mockStatic(Bukkit.class)) {
-
             bukkit.when(Bukkit::getPluginManager).thenReturn(pluginManager);
             service.collectAround(player);
-
         }
 
         verify(drop, never()).remove();

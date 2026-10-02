@@ -20,10 +20,8 @@ public class CommandDispatcher {
     private final ConsoleService consoleService;
 
     public CommandDispatcher(@NotNull NeyShulker plugin, @NotNull ConsoleService consoleService) {
-
         this.plugin = plugin;
         this.consoleService = consoleService;
-
     }
 
     /**

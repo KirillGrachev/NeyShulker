@@ -140,10 +140,6 @@ public class ConfigManager implements NeyShulkerConfig {
 
     }
 
-    // ------------------------------------------------------------------
-    // Снапшот: все значения конфигурации одним неизменяемым объектом
-    // ------------------------------------------------------------------
-
     private record ShulkerSection(OpenMethodType openMethod,
                                   TitleMode titleMode,
                                   String titleFormat,
@@ -239,10 +235,6 @@ public class ConfigManager implements NeyShulkerConfig {
     public void onReload(Runnable listener) {
         reloadListeners.add(listener);
     }
-
-    // ------------------------------------------------------------------
-    // Геттеры контракта: делегируют в текущий снапшот
-    // ------------------------------------------------------------------
 
     @Override
     public boolean isPluginEnabled() {
@@ -435,10 +427,6 @@ public class ConfigManager implements NeyShulkerConfig {
                 .getOrDefault(node, node.getDefaultPermission());
     }
 
-    // ------------------------------------------------------------------
-    // Сборка снапшота
-    // ------------------------------------------------------------------
-
     /**
      * Явно перечитывает файл, если результат штатной загрузки пуст:
      * Bukkit глотает InvalidConfigurationException и молча отдает пустую
@@ -454,22 +442,17 @@ public class ConfigManager implements NeyShulkerConfig {
         }
 
         try {
-
             new YamlConfiguration().load(configFile);
-
         } catch (IOException | InvalidConfigurationException exception) {
-
             plugin.getLogger().log(Level.SEVERE,
                     "config.yml is broken and cannot be parsed - built-in defaults are used. "
                             + "Fix the file and run /shulker reload.",
                     exception);
-
         }
 
     }
 
     private @NotNull ConfigSnapshot buildSnapshot() {
-
         return new ConfigSnapshot(
                 config.getBoolean(PATH_ENABLED, true),
                 buildShulkerSection(),
@@ -478,11 +461,9 @@ public class ConfigManager implements NeyShulkerConfig {
                 buildSounds(),
                 buildPermissionsSection()
         );
-
     }
 
     private @NotNull ShulkerSection buildShulkerSection() {
-
         return new ShulkerSection(
                 parseOpenMethod(),
                 parseTitleMode(),
@@ -493,11 +474,9 @@ public class ConfigManager implements NeyShulkerConfig {
                 readBoolean(PATH_BLOCKED_ITEMS_ENABLED, PATH_LEGACY_BLACKLIST_ENABLED, true),
                 readMaterials(PATH_BLOCKED_ITEMS, PATH_LEGACY_BLACKLIST_ITEMS, DEFAULT_BLACKLIST)
         );
-
     }
 
     private @NotNull AutoCollectSection buildAutoCollectSection() {
-
         return new AutoCollectSection(
                 config.getBoolean(PATH_AUTO_COLLECT_ENABLED, true),
                 config.getBoolean(PATH_AUTO_COLLECT_PERMISSION, false),
@@ -526,7 +505,6 @@ public class ConfigManager implements NeyShulkerConfig {
                         PATH_LEGACY_AUTO_COLLECT_BLACKLIST, DEFAULT_AUTO_COLLECT_BLACKLIST),
                 readGameModes(PATH_AUTO_COLLECT_GAME_MODES, DEFAULT_GAME_MODES)
         );
-
     }
 
     private @NotNull MessagingSection buildMessagingSection() {

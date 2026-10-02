@@ -39,20 +39,16 @@ public final class BoxCollectTarget implements CollectTarget {
                             int slot,
                             ItemStack @NotNull [] workingContents,
                             @NotNull InventoryTransferService transferService) {
-
         this.player = player;
         this.slot = slot;
         this.workingContents = workingContents;
         this.transferService = transferService;
-
     }
 
     @Override
     public @NotNull ItemStack shulkerItem() {
-
         ItemStack box = player.getInventory().getItem(slot);
         return box == null ? new ItemStack(Material.AIR) : box;
-
     }
 
     @Override
@@ -123,25 +119,21 @@ public final class BoxCollectTarget implements CollectTarget {
                 new Object[]{slot, playerName(), inserted.size()});
 
         for (ItemStack stack : inserted) {
-
             try {
                 player.getWorld().dropItemNaturally(player.getLocation(), stack);
             } catch (RuntimeException exception) {
                 LOGGER.log(Level.SEVERE, "Failed to drop collected items back", exception);
             }
-
         }
 
     }
 
     private @NotNull String playerName() {
-
         try {
             return player.getName();
         } catch (RuntimeException exception) {
             return "<unknown>";
         }
-
     }
 
 }

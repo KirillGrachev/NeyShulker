@@ -47,14 +47,12 @@ public final class ShulkerSession {
                            @NotNull Inventory inventory,
                            long openedAt,
                            int slot) {
-
         this.sessionId = sessionId;
         this.playerId = playerId;
         this.shulkerItem = shulkerItem;
         this.inventory = inventory;
         this.openedAt = openedAt;
         this.slot = new AtomicInteger(slot);
-
     }
 
     /**
@@ -76,7 +74,6 @@ public final class ShulkerSession {
                                                  @NotNull ItemStack shulkerItem,
                                                  @NotNull Supplier<Inventory> inventoryFactory,
                                                  int slot) {
-
         return new ShulkerSession(
                 sessionId,
                 player.getUniqueId(),
@@ -85,7 +82,6 @@ public final class ShulkerSession {
                 System.currentTimeMillis(),
                 slot
         );
-
     }
 
     public @NotNull UUID sessionId() {
@@ -163,10 +159,8 @@ public final class ShulkerSession {
     }
 
     public boolean isOnline() {
-
         Player player = getPlayer();
         return player != null && player.isOnline();
-
     }
 
 }

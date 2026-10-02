@@ -95,15 +95,14 @@ class ShulkerGuardListenerTest {
         when(event.getCursor()).thenReturn(null);
         when(event.getCurrentItem()).thenReturn(null);
         when(event.isShiftClick()).thenReturn(false);
+
         return event;
 
     }
 
     private ShulkerSession session(int slot) {
-
         ItemStack shulker = mock(ItemStack.class);
         return ShulkerSession.create(UUID.randomUUID(), player, shulker, () -> gui, slot);
-
     }
 
     @Test
@@ -214,10 +213,6 @@ class ShulkerGuardListenerTest {
 
     }
 
-    // ------------------------------------------------------------------
-    // Drag: исторический дюп «через shift/F» закрывался и здесь
-    // ------------------------------------------------------------------
-
     private InventoryDragEvent drag(Set<Integer> rawSlots,
                                     ItemStack cursor,
                                     Map<Integer, ItemStack> newItems) {
@@ -231,6 +226,7 @@ class ShulkerGuardListenerTest {
         when(event.getRawSlots()).thenReturn(rawSlots);
         when(event.getCursor()).thenReturn(cursor);
         when(event.getNewItems()).thenReturn(newItems);
+
         return event;
 
     }
@@ -307,10 +303,6 @@ class ShulkerGuardListenerTest {
 
     }
 
-    // ------------------------------------------------------------------
-    // Обмен руками (F)
-    // ------------------------------------------------------------------
-
     private PlayerSwapHandItemsEvent swap(ItemStack mainHand, ItemStack offHand) {
 
         PlayerSwapHandItemsEvent event = mock(PlayerSwapHandItemsEvent.class);
@@ -318,6 +310,7 @@ class ShulkerGuardListenerTest {
         when(event.getPlayer()).thenReturn(player);
         when(event.getMainHandItem()).thenReturn(mainHand);
         when(event.getOffHandItem()).thenReturn(offHand);
+
         return event;
 
     }
@@ -370,10 +363,6 @@ class ShulkerGuardListenerTest {
 
     }
 
-    // ------------------------------------------------------------------
-    // Выбросы
-    // ------------------------------------------------------------------
-
     private PlayerDropItemEvent drop(ItemStack stack) {
 
         Item item = mock(Item.class);
@@ -382,6 +371,7 @@ class ShulkerGuardListenerTest {
         when(event.getPlayer()).thenReturn(player);
         when(event.getItemDrop()).thenReturn(item);
         when(item.getItemStack()).thenReturn(stack);
+
         return event;
 
     }

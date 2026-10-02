@@ -46,6 +46,7 @@ class ConsoleServiceTest {
             @Override
             public void close() {
             }
+
         });
 
         when(plugin.getLogger()).thenReturn(logger);

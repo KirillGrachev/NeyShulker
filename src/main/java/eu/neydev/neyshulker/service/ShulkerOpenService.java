@@ -41,7 +41,6 @@ public class ShulkerOpenService {
                               @NotNull ShulkerPersistenceService persistenceService,
                               @NotNull MessageService messageService,
                               @NotNull SoundService soundService) {
-
         this.plugin = plugin;
         this.sessionRegistry = sessionRegistry;
         this.contentService = contentService;
@@ -49,7 +48,6 @@ public class ShulkerOpenService {
         this.persistenceService = persistenceService;
         this.messageService = messageService;
         this.soundService = soundService;
-
     }
 
     /**
@@ -99,7 +97,6 @@ public class ShulkerOpenService {
             }
 
             player.getInventory().setItem(slot, tagged);
-
             ShulkerSession session = createSession(sessionId, player, tagged, slot);
 
             if (session == null) {
@@ -116,6 +113,7 @@ public class ShulkerOpenService {
             player.openInventory(session.inventory());
             persistenceService.scheduleAutoSave(session);
             soundService.playOpen(player);
+
             return true;
 
         } catch (RuntimeException exception) {
@@ -123,6 +121,7 @@ public class ShulkerOpenService {
             plugin.getLogger().log(Level.SEVERE, "Failed to open a shulker box", exception);
             messageService.send(player, MessageKey.OPEN_ERROR, Map.of());
             rollback(player);
+
             return false;
 
         }
@@ -133,12 +132,9 @@ public class ShulkerOpenService {
                                          @NotNull Player player,
                                          @NotNull ItemStack shulker,
                                          int slot) {
-
         String title = titleService.resolve(player, shulker);
-
         return sessionRegistry.createSession(sessionId, player, shulker, slot,
                 () -> new NeyShulkerViewer(title).getInventory());
-
     }
 
     private boolean callOpenEvent(@NotNull Player player,
@@ -147,15 +143,14 @@ public class ShulkerOpenService {
 
         ShulkerOpenEvent event = new ShulkerOpenEvent(player, shulker, session.getSlot());
         plugin.getServer().getPluginManager().callEvent(event);
+
         return !event.isCancelled();
 
     }
 
     private void rollback(@NotNull Player player) {
-
         // GUI к этому моменту не открывался: достаточно снять сессию с реестра
         sessionRegistry.closeSession(player.getUniqueId());
-
     }
 
 }

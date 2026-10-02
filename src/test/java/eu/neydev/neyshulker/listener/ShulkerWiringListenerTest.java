@@ -55,6 +55,7 @@ class ShulkerWiringListenerTest {
 
         Player owner = mock(Player.class);
         when(owner.getUniqueId()).thenReturn(UUID.randomUUID());
+
         return ShulkerSession.create(UUID.randomUUID(), owner, shulker, () -> gui, 2);
 
     }

@@ -26,11 +26,9 @@ public class ShulkerCleanupListener implements Listener {
     public ShulkerCleanupListener(@NotNull SessionRegistry sessionRegistry,
                                   @NotNull ShulkerCloseService closeService,
                                   @NotNull AutoCollectService autoCollectService) {
-
         this.sessionRegistry = sessionRegistry;
         this.closeService = closeService;
         this.autoCollectService = autoCollectService;
-
     }
 
     @EventHandler(priority = EventPriority.MONITOR)

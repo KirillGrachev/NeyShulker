@@ -49,11 +49,9 @@ public class ConsoleService {
      * @param placeholders пары "ключ", "значение"
      */
     public void log(@NotNull ConsoleMessage message, @NotNull String... placeholders) {
-
         for (String line : TEMPLATES.get(message)) {
             plugin.getLogger().warning(applyPlaceholders(line, placeholders));
         }
-
     }
 
     private @NotNull String applyPlaceholders(@NotNull String template,

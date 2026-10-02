@@ -52,6 +52,7 @@ public final class ViewSlotUtil {
 
         int bottomSlot = rawSlot - topSize;
         int bottomSize = sizeOf(view.getBottomInventory());
+
         return bottomSlot < bottomSize ? bottomSlot : OUTSIDE;
 
     }

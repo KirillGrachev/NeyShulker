@@ -66,6 +66,7 @@ class ShulkerCommandTest {
         // Командный путь валидации по умолчанию разрешен
         when(validationService.canOpenViaCommand(eq(player), any()))
                 .thenReturn(ValidationResult.allowed());
+
         return new ShulkerCommand(configManager, permissionService, messageService,
                 openService, validationService, autoCollectService, sessionRegistry);
 
@@ -74,10 +75,8 @@ class ShulkerCommandTest {
     @Test
     @DisplayName("Без аргументов печатается справка")
     void noArgsPrintsUsage() {
-
         commandExecutor().onCommand(player, command, "shulker", new String[0]);
         verify(messageService).send((org.bukkit.command.CommandSender) player, MessageKey.USAGE, java.util.Map.of());
-
     }
 
     @Test
@@ -267,12 +266,9 @@ class ShulkerCommandTest {
     @Test
     @DisplayName("Неизвестная подкоманда печатает справку")
     void unknownSubcommandPrintsUsage() {
-
         commandExecutor().onCommand(player, command, "shulker", new String[]{"teleport"});
-
         verify(messageService)
                 .send((org.bukkit.command.CommandSender) player, MessageKey.USAGE, Map.of());
-
     }
 
     @Test
@@ -291,12 +287,9 @@ class ShulkerCommandTest {
     @Test
     @DisplayName("Tab-completer на втором аргументе пуст")
     void tabCompleteSecondArgumentIsEmpty() {
-
         List<String> none = commandExecutor()
                 .onTabComplete(player, command, "shulker", new String[]{"info", ""});
-
         assertTrue(none.isEmpty());
-
     }
 
     @Test

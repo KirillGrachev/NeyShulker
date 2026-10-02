@@ -21,10 +21,8 @@ public final class SessionCollectTarget implements CollectTarget {
 
     public SessionCollectTarget(@NotNull ShulkerSession session,
                                 @NotNull InventoryTransferService transferService) {
-
         this.session = session;
         this.transferService = transferService;
-
     }
 
     @Override

@@ -144,11 +144,9 @@ class ShulkerUtilTest {
         java.util.Locale previous = java.util.Locale.getDefault();
 
         try {
-
             java.util.Locale.setDefault(new java.util.Locale("tr", "TR"));
             assertEquals("White Shulker Box",
                     ShulkerUtil.prettifyMaterial(Material.WHITE_SHULKER_BOX));
-
         } finally {
             java.util.Locale.setDefault(previous);
         }

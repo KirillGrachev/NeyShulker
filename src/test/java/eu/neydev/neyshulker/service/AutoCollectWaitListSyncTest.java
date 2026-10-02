@@ -122,12 +122,14 @@ class AutoCollectWaitListSyncTest {
             return contents;
 
         });
+
         when(meta.getBlockState()).thenReturn(box);
         ItemStack shulker = mock(ItemStack.class);
 
         when(shulker.getType()).thenReturn(Material.WHITE_SHULKER_BOX);
         when(shulker.clone()).thenReturn(shulker);
         when(shulker.getItemMeta()).thenReturn(meta);
+
         return shulker;
 
     }
@@ -192,6 +194,7 @@ class AutoCollectWaitListSyncTest {
         bukkit.when(Bukkit::getPluginManager).thenReturn(pluginManager);
         bukkit.when(Bukkit::getOnlinePlayers).thenReturn(List.of(fixture.player()));
         bukkit.when(() -> Bukkit.getPlayer(fixture.playerId())).thenReturn(fixture.player());
+
         return bukkit;
 
     }

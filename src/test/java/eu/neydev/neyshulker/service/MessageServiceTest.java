@@ -137,7 +137,6 @@ class MessageServiceTest {
         when(configManager.getMessages(MessageKey.RELOAD)).thenReturn(List.of("{prefix}text"));
 
         List<String> lines = messageService.build(MessageKey.RELOAD, Map.of("prefix", "CALLER "));
-
         assertEquals(List.of("CALLER text"), lines);
 
     }
@@ -145,11 +144,8 @@ class MessageServiceTest {
     @Test
     @DisplayName("build выключенного сообщения пуст")
     void buildDisabledMessageIsEmpty() {
-
         when(configManager.getMessages(MessageKey.SAVED)).thenReturn(List.of());
-
         assertTrue(messageService.build(MessageKey.SAVED, Map.of()).isEmpty());
-
     }
 
     @Test

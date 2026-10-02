@@ -149,6 +149,7 @@ public final class ShulkerUtil {
         boxInventory.clear();
 
         if (contents != null) {
+
             for (int i = 0; i < contents.length && i < SHULKER_SIZE; i++) {
 
                 ItemStack itemStack = contents[i];
@@ -158,6 +159,7 @@ public final class ShulkerUtil {
                 }
 
             }
+
         }
 
         blockStateMeta.setBlockState(box);

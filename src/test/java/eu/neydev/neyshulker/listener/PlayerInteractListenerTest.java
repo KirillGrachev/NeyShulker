@@ -58,6 +58,7 @@ class PlayerInteractListenerTest {
         when(configManager.isPluginEnabled()).thenReturn(true);
         when(player.getInventory()).thenReturn(inventory);
         when(player.getItemOnCursor()).thenReturn(null);
+
         return new PlayerInteractListener(plugin, configManager, validationService,
                 openService, messageService, sessionRegistry);
 
@@ -70,6 +71,7 @@ class PlayerInteractListenerTest {
         when(event.getAction()).thenReturn(action);
         when(event.getHand()).thenReturn(EquipmentSlot.HAND);
         when(event.getPlayer()).thenReturn(player);
+
         return event;
 
     }

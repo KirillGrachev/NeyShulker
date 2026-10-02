@@ -39,8 +39,7 @@ class RepeatingTaskTest {
             bukkit.when(Bukkit::getScheduler).thenReturn(scheduler);
             bukkit.when(Bukkit::isPrimaryThread).thenReturn(true);
 
-            RepeatingTask repeating = new RepeatingTask(plugin, () -> {
-            });
+            RepeatingTask repeating = new RepeatingTask(plugin, () -> {});
 
             assertFalse(repeating.isRunning());
             repeating.start(20L, 20L);
@@ -97,8 +96,7 @@ class RepeatingTaskTest {
             bukkit.when(Bukkit::getScheduler).thenReturn(scheduler);
             bukkit.when(Bukkit::isPrimaryThread).thenReturn(false);
 
-            RepeatingTask repeating = new RepeatingTask(plugin, () -> {
-            });
+            RepeatingTask repeating = new RepeatingTask(plugin, () -> {});
             repeating.start(5L, 5L);
 
             // Прямой регистрации таймера нет - вместо нее задача на главный поток
@@ -127,8 +125,7 @@ class RepeatingTaskTest {
             bukkit.when(Bukkit::getScheduler).thenReturn(scheduler);
             bukkit.when(Bukkit::isPrimaryThread).thenReturn(true);
 
-            RepeatingTask repeating = new RepeatingTask(plugin, () -> {
-            });
+            RepeatingTask repeating = new RepeatingTask(plugin, () -> {});
             repeating.start(1L, 1L);
             assertTrue(repeating.isRunning());
 

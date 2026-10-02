@@ -69,6 +69,7 @@ class ShulkerPersistenceServiceTest {
         when(shulker.getType()).thenReturn(Material.WHITE_SHULKER_BOX);
         when(shulker.clone()).thenAnswer(answer -> shulker);
         when(shulker.getItemMeta()).thenReturn(meta);
+
         return shulker;
 
     }
@@ -81,6 +82,7 @@ class ShulkerPersistenceServiceTest {
         when(player.getUniqueId()).thenReturn(UUID.randomUUID());
         when(player.getInventory()).thenReturn(inventory);
         when(player.getName()).thenReturn("NeyTM");
+
         return player;
 
     }
@@ -140,6 +142,7 @@ class ShulkerPersistenceServiceTest {
         when(shulker.getType()).thenReturn(Material.WHITE_SHULKER_BOX);
         when(shulker.clone()).thenAnswer(answer -> shulker);
         when(shulker.getItemMeta()).thenReturn(meta);
+
         return shulker;
 
     }
@@ -154,6 +157,7 @@ class ShulkerPersistenceServiceTest {
         when(twin.getType()).thenReturn(Material.WHITE_SHULKER_BOX);
         when(twin.clone()).thenAnswer(answer -> twin);
         when(twin.getItemMeta()).thenReturn(null);
+
         return twin;
 
     }
@@ -250,7 +254,6 @@ class ShulkerPersistenceServiceTest {
         verify(player, times(1)).closeInventory();
 
         // Консольных уведомлений о detach нет: поведение тихое по решению владельца
-
         verify(player, times(1)).closeInventory();
 
     }

@@ -26,11 +26,9 @@ public class ShulkerOpenEvent extends NeyShulkerEvent implements Cancellable {
     public ShulkerOpenEvent(@NotNull Player player,
                             @NotNull ItemStack shulkerItem,
                             int slot) {
-
         this.player = player;
         this.shulkerItem = shulkerItem.clone();
         this.slot = slot;
-
     }
 
     public @NotNull Player getPlayer() {

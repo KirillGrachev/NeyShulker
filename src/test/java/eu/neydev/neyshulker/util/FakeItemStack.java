@@ -20,11 +20,9 @@ public class FakeItemStack extends ItemStack {
     }
 
     public FakeItemStack(@NotNull Material material, int amount, int maxStackSize) {
-
         this.material = material;
         this.amount = amount;
         this.maxStackSize = maxStackSize;
-
     }
 
     @Override

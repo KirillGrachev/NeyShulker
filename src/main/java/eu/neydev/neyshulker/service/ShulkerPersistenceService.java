@@ -47,13 +47,11 @@ public class ShulkerPersistenceService {
                                      @NotNull SessionRegistry sessionRegistry,
                                      @NotNull ShulkerContentService contentService,
                                      @NotNull MessageService messageService) {
-
         this.plugin = plugin;
         this.config = config;
         this.sessionRegistry = sessionRegistry;
         this.contentService = contentService;
         this.messageService = messageService;
-
     }
 
     /**
@@ -121,11 +119,9 @@ public class ShulkerPersistenceService {
             return true;
 
         } catch (RuntimeException exception) {
-
             plugin.getLogger().log(Level.SEVERE,
                     "Failed to save the shulker box of player " + player.getName(), exception);
             return false;
-
         } finally {
             session.saving().set(false);
         }
@@ -216,7 +212,6 @@ public class ShulkerPersistenceService {
     public void scheduleAutoSave(@NotNull ShulkerSession session) {
 
         cancelAutoSave(session);
-
         long interval = config.getSaveInterval();
 
         BukkitTask task = Bukkit.getScheduler().runTaskTimer(plugin,
@@ -249,10 +244,8 @@ public class ShulkerPersistenceService {
      * Останавливает все задачи автосохранения.
      */
     public void cancelAllAutoSaves() {
-
         autoSaveTasks.values().forEach(BukkitTask::cancel);
         autoSaveTasks.clear();
-
     }
 
     /**

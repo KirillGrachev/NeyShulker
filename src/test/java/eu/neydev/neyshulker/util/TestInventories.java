@@ -108,6 +108,7 @@ public final class TestInventories {
 
         when(view.getTopInventory()).thenReturn(top);
         when(view.getBottomInventory()).thenReturn(bottom);
+
         return view;
 
     }

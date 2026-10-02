@@ -34,11 +34,9 @@ public class ShulkerValidationService {
     public ShulkerValidationService(@NotNull NeyShulkerConfig config,
                                     @NotNull PermissionService permissionService,
                                     @NotNull SessionRegistry sessionRegistry) {
-
         this.config = config;
         this.permissionService = permissionService;
         this.sessionRegistry = sessionRegistry;
-
     }
 
     /**
@@ -306,6 +304,7 @@ public class ShulkerValidationService {
 
             // Shift - явный модификатор "нужен GUI", воздух - быстрый путь
             case SMART -> sneaking || rightClickAir;
+
         };
 
     }

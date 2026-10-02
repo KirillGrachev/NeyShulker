@@ -17,10 +17,8 @@ public enum PermissionNode {
     private final String defaultPermission;
 
     PermissionNode(String configKey, String defaultPermission) {
-
         this.configKey = configKey;
         this.defaultPermission = defaultPermission;
-
     }
 
     public @NotNull String getConfigKey() {

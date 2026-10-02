@@ -140,13 +140,11 @@ public class NeyShulker extends JavaPlugin {
     }
 
     private void unregisterExpansion() {
-
         if (expansion != null) {
             expansion.shutdown();
             expansion.unregister();
             expansion = null;
         }
-
     }
 
 }

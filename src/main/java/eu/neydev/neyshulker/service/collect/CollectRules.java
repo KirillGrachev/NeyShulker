@@ -37,11 +37,9 @@ public final class CollectRules {
     public CollectRules(@NotNull NeyShulkerConfig config,
                         @NotNull PermissionService permissionService,
                         @NotNull PlayerDropTracker dropTracker) {
-
         this.config = config;
         this.permissionService = permissionService;
         this.dropTracker = dropTracker;
-
     }
 
     /**
@@ -177,10 +175,8 @@ public final class CollectRules {
     }
 
     private @NotNull Set<GameMode> allowedGameModes() {
-
         Set<GameMode> modes = config.getAutoCollectGameModes();
         return modes == null || modes.isEmpty() ? DEFAULT_GAME_MODES : modes;
-
     }
 
     /**

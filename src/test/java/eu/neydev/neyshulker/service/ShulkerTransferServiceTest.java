@@ -39,6 +39,7 @@ class ShulkerTransferServiceTest {
 
         when(player.getUniqueId()).thenReturn(UUID.randomUUID());
         when(player.isOnline()).thenReturn(true);
+
         return player;
 
     }
@@ -61,10 +62,8 @@ class ShulkerTransferServiceTest {
         when(sessionRegistry.getSession(player.getUniqueId())).thenReturn(session);
 
         try (MockedStatic<Bukkit> bukkit = mockStatic(Bukkit.class)) {
-
             bukkit.when(() -> Bukkit.getPlayer(player.getUniqueId())).thenReturn(player);
             transferService.markChanged(session);
-
         }
 
         verify(persistenceService).scheduleSave(session);
@@ -81,14 +80,11 @@ class ShulkerTransferServiceTest {
         when(sessionRegistry.getSession(player.getUniqueId())).thenReturn(null);
 
         try (MockedStatic<Bukkit> bukkit = mockStatic(Bukkit.class)) {
-
             bukkit.when(() -> Bukkit.getPlayer(player.getUniqueId())).thenReturn(player);
             transferService.markChanged(session);
-
         }
 
         transferService.markChanged(null);
-
         verify(persistenceService, never()).scheduleSave(any());
 
     }
@@ -104,10 +100,8 @@ class ShulkerTransferServiceTest {
         when(offline.isOnline()).thenReturn(false);
 
         try (MockedStatic<Bukkit> bukkit = mockStatic(Bukkit.class)) {
-
             bukkit.when(() -> Bukkit.getPlayer(player.getUniqueId())).thenReturn(offline);
             transferService.markChanged(session);
-
         }
 
         verify(persistenceService, never()).scheduleSave(any());

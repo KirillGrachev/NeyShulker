@@ -51,6 +51,7 @@ class CollectScanTargetTest {
 
         when(inventory.getContents()).thenReturn(contents);
         when(player.getInventory()).thenReturn(inventory);
+
         return new CollectScan(player, null, configManager, transferService, persistenceService);
 
     }
@@ -105,15 +106,14 @@ class CollectScanTargetTest {
         when(shulker.getAmount()).thenReturn(slot);
         when(shulker.clone()).thenReturn(shulker);
         when(shulker.getItemMeta()).thenReturn(meta);
+
         return shulker;
 
     }
 
     private int targetSlot(CollectScan scan, Material material) {
-
         CollectTarget target = scan.targetFor(new FakeItemStack(material, 1));
         return target == null ? -1 : ((BoxCollectTarget) target).getSlot();
-
     }
 
     @Test
@@ -121,7 +121,6 @@ class CollectScanTargetTest {
     void mergeTierPrefersStackWithMostRoom() {
 
         defaultRules();
-
         CollectScan scan = scan(
                 box(0, new FakeItemStack(Material.COBBLESTONE, 41)),
                 box(1, new FakeItemStack(Material.COBBLESTONE, 10)));
@@ -136,7 +135,6 @@ class CollectScanTargetTest {
     void typeTierConsolidatesIntoFullerBox() {
 
         defaultRules();
-
         CollectScan scan = scan(
                 box(0, new FakeItemStack(Material.COBBLESTONE, 64),
                         new FakeItemStack(Material.COBBLESTONE, 64)),

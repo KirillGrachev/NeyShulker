@@ -27,12 +27,10 @@ public class ShulkerCloseService {
                                @NotNull SessionRegistry sessionRegistry,
                                @NotNull ShulkerPersistenceService persistenceService,
                                @NotNull SoundService soundService) {
-
         this.plugin = plugin;
         this.sessionRegistry = sessionRegistry;
         this.persistenceService = persistenceService;
         this.soundService = soundService;
-
     }
 
     /**
@@ -78,6 +76,7 @@ public class ShulkerCloseService {
 
         callCloseEvent(player, session, saved);
         soundService.playClose(player);
+
         return true;
 
     }
@@ -114,10 +113,8 @@ public class ShulkerCloseService {
     private void callCloseEvent(@NotNull Player player,
                                 @NotNull ShulkerSession session,
                                 @NotNull ItemStack saved) {
-
         plugin.getServer().getPluginManager().callEvent(
                 new ShulkerCloseEvent(player, saved, session.getSlot()));
-
     }
 
 }

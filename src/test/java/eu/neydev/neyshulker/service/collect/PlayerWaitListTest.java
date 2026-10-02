@@ -26,6 +26,7 @@ class PlayerWaitListTest {
 
         when(stack.getType()).thenReturn(material);
         when(item.getItemStack()).thenReturn(stack);
+
         return item;
 
     }

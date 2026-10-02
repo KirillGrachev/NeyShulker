@@ -44,6 +44,7 @@ public final class ItemStackTransaction {
 
             int moved = newDestination.getAmount();
             newSource.setAmount(source.getAmount() - moved);
+
             return new TransferResult(normalize(newSource), normalize(newDestination), moved);
 
         }

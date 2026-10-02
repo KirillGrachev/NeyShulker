@@ -20,10 +20,8 @@ public class ShulkerTransferService {
 
     public ShulkerTransferService(@NotNull SessionRegistry sessionRegistry,
                                   @NotNull ShulkerPersistenceService persistenceService) {
-
         this.sessionRegistry = sessionRegistry;
         this.persistenceService = persistenceService;
-
     }
 
     /**
@@ -45,10 +43,7 @@ public class ShulkerTransferService {
 
     private boolean isActive(@Nullable ShulkerSession session) {
 
-        if (session == null) {
-            return false;
-        }
-
+        if (session == null) return false;
         Player player = session.getPlayer();
 
         return player != null && player.isOnline()

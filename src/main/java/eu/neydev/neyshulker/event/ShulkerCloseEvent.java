@@ -23,11 +23,9 @@ public class ShulkerCloseEvent extends NeyShulkerEvent {
     public ShulkerCloseEvent(@NotNull Player player,
                              @NotNull ItemStack savedItem,
                              int slot) {
-
         this.player = player;
         this.savedItem = savedItem.clone();
         this.slot = slot;
-
     }
 
     public @NotNull Player getPlayer() {

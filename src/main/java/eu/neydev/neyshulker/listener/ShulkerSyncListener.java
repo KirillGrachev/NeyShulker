@@ -28,10 +28,8 @@ public class ShulkerSyncListener implements Listener {
 
     public ShulkerSyncListener(@NotNull SessionRegistry sessionRegistry,
                                @NotNull ShulkerTransferService transferService) {
-
         this.sessionRegistry = sessionRegistry;
         this.transferService = transferService;
-
     }
 
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = false)

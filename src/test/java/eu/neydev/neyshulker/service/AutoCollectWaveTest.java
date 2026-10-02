@@ -132,6 +132,7 @@ class AutoCollectWaveTest {
         when(shulker.getType()).thenReturn(Material.WHITE_SHULKER_BOX);
         when(shulker.clone()).thenReturn(shulker);
         when(shulker.getItemMeta()).thenReturn(meta);
+
         return shulker;
 
     }

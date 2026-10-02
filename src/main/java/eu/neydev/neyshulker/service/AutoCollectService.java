@@ -83,7 +83,6 @@ public class AutoCollectService {
                               @NotNull CollectRules rules,
                               @NotNull NearbyItemsFinder nearbyItemsFinder,
                               @NotNull PlayerDropTracker dropTracker) {
-
         this.plugin = plugin;
         this.config = config;
         this.sessionRegistry = sessionRegistry;
@@ -94,7 +93,6 @@ public class AutoCollectService {
         this.rules = rules;
         this.nearbyItemsFinder = nearbyItemsFinder;
         this.dropTracker = dropTracker;
-
     }
 
     /**
@@ -139,10 +137,8 @@ public class AutoCollectService {
      * Подписку на reload конфигурации выполняет ServiceContainer.
      */
     public void restart() {
-
         stop();
         start();
-
     }
 
     /**
@@ -391,13 +387,10 @@ public class AutoCollectService {
 
             // Sealed-иерархия источника: компилятор гарантирует полноту веток
             DrainStep step = switch (entry) {
-
                 case CollectEntry.Ground ground ->
                         drainGroundEntry(player, scan, waitList, ground, neighbors);
-
                 case CollectEntry.Slot inventoryEntry ->
                         drainInventoryEntry(player, scan, inventoryEntry);
-
             };
 
             collected += step.moved();
@@ -546,11 +539,9 @@ public class AutoCollectService {
     private boolean inventoryEntryStale(@NotNull Player player,
                                         @Nullable ItemStack stack,
                                         @NotNull CollectEntry entry) {
-
         return ShulkerUtil.isEmpty(stack)
                 || stack.getType() != entry.material()
                 || rules.isExcluded(player, stack);
-
     }
 
     /**
@@ -605,10 +596,8 @@ public class AutoCollectService {
      * @return число элементов в очереди переноса
      */
     public int waitListSize(@NotNull Player player) {
-
         PlayerWaitList waitList = waitLists.get(player.getUniqueId());
         return waitList == null ? 0 : waitList.size();
-
     }
 
     /**
@@ -683,6 +672,7 @@ public class AutoCollectService {
         ShulkerAutoCollectEvent event = new ShulkerAutoCollectEvent(
                 player, item, source, sourceSlot, target.shulkerItem());
         Bukkit.getPluginManager().callEvent(event);
+
         return !event.isCancelled();
 
     }
@@ -692,11 +682,9 @@ public class AutoCollectService {
         // Выключенное сообщение дает пустой список строк: MessageService сам
         // промолчит, отдельный тумблер автосбору больше не нужен
         if (collected > 0) {
-
             messageService.send(player, MessageKey.AUTO_COLLECT,
                     Map.of("amount", String.valueOf(collected)));
             return;
-
         }
 
         if (!noSpace) {

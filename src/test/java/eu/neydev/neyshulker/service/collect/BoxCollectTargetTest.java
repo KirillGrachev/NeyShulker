@@ -52,6 +52,7 @@ class BoxCollectTargetTest {
             return contents;
 
         });
+
         when(meta.getBlockState()).thenReturn(box);
 
         ItemStack shulker = mock(ItemStack.class);
@@ -59,6 +60,7 @@ class BoxCollectTargetTest {
         when(shulker.getType()).thenReturn(Material.WHITE_SHULKER_BOX);
         when(shulker.clone()).thenAnswer(answer -> shulker);
         when(shulker.getItemMeta()).thenReturn(meta);
+
         return shulker;
 
     }
@@ -71,6 +73,7 @@ class BoxCollectTargetTest {
         when(player.getWorld()).thenReturn(world);
         when(player.getLocation()).thenReturn(mock(Location.class));
         when(player.getName()).thenReturn("Tester");
+
         return player;
 
     }

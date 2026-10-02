@@ -153,12 +153,9 @@ class ShulkerValidationServiceTest {
     @Test
     @DisplayName("Шалкер в шалкере запрещен всегда, без тумблеров")
     void nestedShulkerAlwaysDenied() {
-
         ItemStack nested = new FakeItemStack(Material.BLACK_SHULKER_BOX, 1);
-
         assertEquals(ValidationReason.NESTED_SHULKER,
                 validationService.canEnterShulker(player, nested).reason());
-
     }
 
     @Test
@@ -251,10 +248,8 @@ class ShulkerValidationServiceTest {
     @Test
     @DisplayName("Без сессии выброс не блокируется")
     void noSessionNoBlock() {
-
         when(sessionRegistry.getSession(player)).thenReturn(null);
         assertFalse(validationService.isHeldOpenShulker(player));
-
     }
 
     @Test
@@ -288,10 +283,8 @@ class ShulkerValidationServiceTest {
     @Test
     @DisplayName("Без сессии выброшенный шалкер не считается открытым")
     void droppedShulkerWithoutSessionIsNotOpen() {
-
         when(sessionRegistry.getSession(player)).thenReturn(null);
         assertFalse(validationService.isDroppedOpenShulker(player, shulker()));
-
     }
 
     @Test

@@ -40,6 +40,7 @@ class NeyShulkerExpansionTest {
 
         Player player = mock(Player.class);
         when(player.getUniqueId()).thenReturn(UUID.randomUUID());
+
         return player;
 
     }
@@ -232,10 +233,8 @@ class NeyShulkerExpansionTest {
 
         try (org.mockito.MockedStatic<org.bukkit.Bukkit> bukkit =
                      org.mockito.Mockito.mockStatic(org.bukkit.Bukkit.class)) {
-
             bukkit.when(org.bukkit.Bukkit::isPrimaryThread).thenReturn(true);
             assertEquals("White Shulker Box", expansion.onRequest(player, "name"));
-
         }
 
     }

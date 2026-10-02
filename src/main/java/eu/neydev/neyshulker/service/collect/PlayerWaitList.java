@@ -65,6 +65,7 @@ public final class PlayerWaitList {
 
         int before = entries.size();
         entries.removeIf(filter);
+
         return before - entries.size();
 
     }

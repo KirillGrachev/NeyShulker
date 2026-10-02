@@ -24,6 +24,7 @@ class PlayerDropTrackerTest {
 
         Item item = mock(Item.class);
         when(item.getUniqueId()).thenReturn(UUID.randomUUID());
+
         return item;
 
     }

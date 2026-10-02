@@ -25,6 +25,7 @@ class NeyShulkerEventTest {
 
         ItemStack item = mock(ItemStack.class);
         when(item.clone()).thenReturn(item);
+
         return item;
 
     }

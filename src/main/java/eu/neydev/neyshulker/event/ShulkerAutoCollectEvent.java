@@ -37,13 +37,11 @@ public class ShulkerAutoCollectEvent extends NeyShulkerEvent implements Cancella
                                    @NotNull ItemStack sourceItem,
                                    int slot,
                                    @NotNull ItemStack targetShulker) {
-
         this.player = player;
         this.item = item;
         this.sourceItem = sourceItem.clone();
         this.slot = slot;
         this.targetShulker = targetShulker.clone();
-
     }
 
     public @NotNull Player getPlayer() {

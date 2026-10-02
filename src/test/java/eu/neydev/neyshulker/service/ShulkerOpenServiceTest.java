@@ -59,6 +59,7 @@ class ShulkerOpenServiceTest {
         Player player = mock(Player.class);
         when(player.getUniqueId()).thenReturn(java.util.UUID.randomUUID());
         when(player.getInventory()).thenReturn(playerInventory);
+
         return player;
 
     }
@@ -80,6 +81,7 @@ class ShulkerOpenServiceTest {
         when(shulker.getType()).thenReturn(Material.WHITE_SHULKER_BOX);
         when(shulker.clone()).thenReturn(shulker);
         when(shulker.getItemMeta()).thenReturn(meta);
+
         return shulker;
 
     }
@@ -99,6 +101,7 @@ class ShulkerOpenServiceTest {
         when(server.getPluginManager()).thenReturn(pluginManager);
         when(plugin.getServer()).thenReturn(server);
         when(plugin.getLogger()).thenReturn(java.util.logging.Logger.getLogger("open-test"));
+
         return plugin;
 
     }
@@ -113,12 +116,9 @@ class ShulkerOpenServiceTest {
         NeyShulker plugin = pluginWithEvents();
 
         try (MockedStatic<Bukkit> bukkit = mockStatic(Bukkit.class)) {
-
             bukkit.when(() -> Bukkit.createInventory(any(), anyInt(), anyString()))
                     .thenReturn(gui);
-
             assertTrue(openService(plugin).open(player, shulker(), 3));
-
         }
 
         assertNotNull(sessionRegistry.getSession(player));
@@ -146,17 +146,15 @@ class ShulkerOpenServiceTest {
 
             ShulkerOpenEvent event = invocation.getArgument(0);
             event.setCancelled(true);
+
             return null;
 
         }).when(pluginManager).callEvent(any(Event.class));
 
         try (MockedStatic<Bukkit> bukkit = mockStatic(Bukkit.class)) {
-
             bukkit.when(() -> Bukkit.createInventory(any(), anyInt(), anyString()))
                     .thenReturn(gui);
-
             assertFalse(openService(plugin).open(player, shulker(), 3));
-
         }
 
         assertNull(sessionRegistry.getSession(player));
@@ -228,6 +226,7 @@ class ShulkerOpenServiceTest {
             @Override
             public void close() {
             }
+
         });
 
         NeyShulker plugin = pluginWithEvents();
@@ -237,6 +236,7 @@ class ShulkerOpenServiceTest {
 
         assertNull(sessionRegistry.getSession(player));
         verify(messageService).send(player, MessageKey.OPEN_ERROR, java.util.Map.of());
+
         assertEquals(1, records.size());
         assertEquals(java.util.logging.Level.SEVERE, records.get(0).getLevel());
         assertNotNull(records.get(0).getThrown(), "Стектрейс исключения обязателен");
@@ -265,6 +265,7 @@ class ShulkerOpenServiceTest {
         when(meta.getBlockState()).thenReturn(box);
         when(meta.getPersistentDataContainer()).thenReturn(pdc);
         when(meta.hasDisplayName()).thenReturn(false);
+
         org.mockito.Mockito.doAnswer(invocation -> {
             store.put(invocation.getArgument(0), invocation.getArgument(2));
             return null;
@@ -280,12 +281,9 @@ class ShulkerOpenServiceTest {
         NeyShulker plugin = pluginWithEvents();
 
         try (MockedStatic<Bukkit> bukkit = mockStatic(Bukkit.class)) {
-
             bukkit.when(() -> Bukkit.createInventory(any(), anyInt(), anyString()))
                     .thenReturn(gui);
-
             assertTrue(openService(plugin).open(player, shulker, 5));
-
         }
 
         // В слот записан предмет с меткой, и метка совпадает с id сессии
@@ -293,6 +291,7 @@ class ShulkerOpenServiceTest {
         assertNotNull(session);
         assertEquals(session.sessionId().toString(),
                 store.get(org.bukkit.NamespacedKey.fromString("neyshulker:session")));
+
         verify(playerInventory).setItem(eq(5), any(ItemStack.class));
 
     }

@@ -33,6 +33,7 @@ class ShulkerTitleServiceTest {
         when(shulker.getItemMeta()).thenReturn(meta);
         when(meta.hasDisplayName()).thenReturn(displayName != null);
         when(meta.getDisplayName()).thenReturn(displayName);
+
         return shulker;
 
     }

@@ -21,10 +21,8 @@ public class RepeatingTask {
     private volatile BukkitTask task;
 
     public RepeatingTask(@NotNull Plugin plugin, @NotNull Runnable action) {
-
         this.plugin = plugin;
         this.action = action;
-
     }
 
     /**
@@ -66,10 +64,8 @@ public class RepeatingTask {
      * (например, при выключении сервера) флаг честно сбрасывается.
      */
     public boolean isRunning() {
-
         BukkitTask current = task;
         return current != null && !current.isCancelled();
-
     }
 
 }

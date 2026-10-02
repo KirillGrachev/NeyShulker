@@ -87,6 +87,7 @@ class ConfigTypesTest {
                 Sound.ENTITY_ITEM_PICKUP, false, 1.0f, 1.0f, () -> {
                     throw new AssertionError("blank name is not unknown");
                 });
+
         assertSame(Sound.ENTITY_ITEM_PICKUP, blank.sound());
         assertFalse(blank.enabled());
 

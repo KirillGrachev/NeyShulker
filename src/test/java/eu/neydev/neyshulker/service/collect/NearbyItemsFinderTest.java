@@ -49,6 +49,7 @@ class NearbyItemsFinderTest {
         when(item.getItemStack()).thenReturn(new FakeItemStack(material, amount));
         when(item.getLocation()).thenReturn(location);
         when(location.distanceSquared(playerLocation)).thenReturn(distanceSquared);
+
         return item;
 
     }

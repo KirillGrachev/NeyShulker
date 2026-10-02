@@ -71,11 +71,9 @@ public class ShulkerGuardListener implements Listener {
     public ShulkerGuardListener(@NotNull SessionRegistry sessionRegistry,
                                 @NotNull ShulkerValidationService validationService,
                                 @NotNull MessageService messageService) {
-
         this.sessionRegistry = sessionRegistry;
         this.validationService = validationService;
         this.messageService = messageService;
-
     }
 
     @EventHandler(priority = EventPriority.NORMAL, ignoreCancelled = true)
@@ -102,10 +100,8 @@ public class ShulkerGuardListener implements Listener {
         //     который не равен rawSlot и без этой проверки уходил бы в обход
         if (event.getClick() == ClickType.NUMBER_KEY
                 && validationService.isShulkerSlot(session, event.getHotbarButton())) {
-
             cancel(event, player, MessageKey.MOVE_BLOCKED);
             return;
-
         }
 
         // Shift-клик тянет предмет из нижней клетки в GUI ванильным путем:
@@ -216,9 +212,12 @@ public class ShulkerGuardListener implements Listener {
         ItemStack dropped = event.getItemDrop().getItemStack();
 
         if (SessionTagger.isSession(dropped, session.sessionId())) {
+
             event.setCancelled(true);
             messageService.send(player, MessageKey.DROP_BLOCKED);
+
             return;
+
         }
 
         if (consumeAllowedDrop(player, dropped)) {
@@ -266,15 +265,11 @@ public class ShulkerGuardListener implements Listener {
         int maxAmount = 0;
 
         if (click == ClickType.DROP || click == ClickType.CONTROL_DROP) {
-
             source = event.getCurrentItem();
             maxAmount = click == ClickType.DROP ? 1 : amountOf(source);
-
         } else if (event.getRawSlot() < 0 && !ShulkerUtil.isEmpty(event.getCursor())) {
-
             source = event.getCursor();
             maxAmount = amountOf(source);
-
         }
 
         if (source == null || ShulkerUtil.isEmpty(source) || maxAmount <= 0) {
@@ -317,17 +312,13 @@ public class ShulkerGuardListener implements Listener {
      * Проверяет, указывает ли сырой слот клика на сам открытый шалкер-бокс.
      */
     private boolean isShulkerSlot(@NotNull InventoryClickEvent event, @NotNull ShulkerSession session) {
-
         int bottomSlot = ViewSlotUtil.bottomSlot(event.getView(), event.getRawSlot());
         return validationService.isShulkerSlot(session, bottomSlot);
-
     }
 
     private boolean isShulkerSlot(@NotNull Player player, int rawSlot, @NotNull ShulkerSession session) {
-
         int bottomSlot = ViewSlotUtil.bottomSlot(player.getOpenInventory(), rawSlot);
         return validationService.isShulkerSlot(session, bottomSlot);
-
     }
 
     /**
@@ -338,18 +329,13 @@ public class ShulkerGuardListener implements Listener {
      */
     private @Nullable ItemStack enteringItem(@NotNull Player player,
                                              @NotNull InventoryClickEvent event) {
-
         return switch (event.getClick()) {
-
             case NUMBER_KEY -> event.getHotbarButton() >= 0
                     ? player.getInventory().getItem(event.getHotbarButton())
                     : null;
-
             case SWAP_OFFHAND -> player.getInventory().getItemInOffHand();
             default -> event.getCursor();
-
         };
-
     }
 
     private boolean isDisallowed(@NotNull Player player, @Nullable ItemStack item) {
@@ -371,19 +357,15 @@ public class ShulkerGuardListener implements Listener {
     private void cancel(@NotNull InventoryClickEvent event,
                         @NotNull Player player,
                         @NotNull MessageKey key) {
-
         event.setCancelled(true);
         messageService.send(player, key);
-
     }
 
     private void cancel(@NotNull InventoryDragEvent event,
                         @NotNull Player player,
                         @NotNull MessageKey key) {
-
         event.setCancelled(true);
         messageService.send(player, key);
-
     }
 
     private void cancel(@NotNull InventoryDragEvent event,

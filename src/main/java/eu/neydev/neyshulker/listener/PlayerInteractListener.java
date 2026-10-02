@@ -41,14 +41,12 @@ public class PlayerInteractListener implements Listener {
                                   @NotNull ShulkerOpenService openService,
                                   @NotNull MessageService messageService,
                                   @NotNull SessionRegistry sessionRegistry) {
-
         this.plugin = plugin;
         this.config = config;
         this.validationService = validationService;
         this.openService = openService;
         this.messageService = messageService;
         this.sessionRegistry = sessionRegistry;
-
     }
 
     /**

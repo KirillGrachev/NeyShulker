@@ -28,6 +28,7 @@ class PlayerDropListenerTest {
         when(drop.getUniqueId()).thenReturn(UUID.randomUUID());
         PlayerDropItemEvent event = mock(PlayerDropItemEvent.class);
         when(event.getItemDrop()).thenReturn(drop);
+
         listener.onDropItem(event);
         assertTrue(tracker.isPlayerDropped(drop));
 

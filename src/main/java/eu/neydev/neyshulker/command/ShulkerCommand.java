@@ -51,7 +51,6 @@ public class ShulkerCommand implements TabExecutor {
                           @NotNull ShulkerValidationService validationService,
                           @NotNull AutoCollectService autoCollectService,
                           @NotNull SessionRegistry sessionRegistry) {
-
         this.configManager = configManager;
         this.permissionService = permissionService;
         this.messageService = messageService;
@@ -59,7 +58,6 @@ public class ShulkerCommand implements TabExecutor {
         this.validationService = validationService;
         this.autoCollectService = autoCollectService;
         this.sessionRegistry = sessionRegistry;
-
     }
 
     @Override
@@ -239,10 +237,8 @@ public class ShulkerCommand implements TabExecutor {
      * @return текст статуса для подстановки
      */
     private @NotNull String state(boolean enabled) {
-
         return String.join(" ", messageService.build(
                 enabled ? MessageKey.STATE_ON : MessageKey.STATE_OFF, Map.of()));
-
     }
 
 }
